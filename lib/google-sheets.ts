@@ -332,12 +332,27 @@ function mergeSessions(
   return merged;
 }
 
-function formatDateLabel(date: Date) {
-  return date.toLocaleDateString("vi-VN");
+function shiftToSheetLocal(date: Date, tzOffsetMinutes: number) {
+  return new Date(date.getTime() + tzOffsetMinutes * 60 * 1000);
 }
 
-function formatDateTimeLabel(date: Date) {
-  return date.toLocaleString("vi-VN");
+function formatDateLabel(date: Date, tzOffsetMinutes: number) {
+  const shifted = shiftToSheetLocal(date, tzOffsetMinutes);
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const y = shifted.getUTCFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+function formatDateTimeLabel(date: Date, tzOffsetMinutes: number) {
+  const shifted = shiftToSheetLocal(date, tzOffsetMinutes);
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const y = shifted.getUTCFullYear();
+  const hh = String(shifted.getUTCHours()).padStart(2, "0");
+  const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
+  const ss = String(shifted.getUTCSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss} ${d}/${m}/${y}`;
 }
 
 function parseSheetDate(value: unknown, tzOffsetMinutes = 0) {
@@ -362,7 +377,10 @@ function parseSheetDate(value: unknown, tzOffsetMinutes = 0) {
       const hour = Number(m[4]);
       const minute = Number(m[5]);
       const second = Number(m[6] || "0");
-      const parsed = new Date(year, month, day, hour, minute, second);
+      // Parse sheet-local datetime to UTC by subtracting configured sheet offset.
+      const parsed = new Date(
+        Date.UTC(year, month, day, hour, minute, second) - tzOffsetMinutes * 60 * 1000,
+      );
       if (!isNaN(parsed.getTime())) return parsed;
     }
 
@@ -385,6 +403,21 @@ function formatDateLabelFromKey(dateKey: string) {
   const [y, m, d] = dateKey.split("-").map((x) => Number(x));
   if (!y || !m || !d) return dateKey;
   return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+function getDailyWindowBySheetOffset(tzOffsetMinutes: number, endHourLocal = 6) {
+  const nowUtc = Date.now();
+  const nowLocal = new Date(nowUtc + tzOffsetMinutes * 60 * 1000);
+
+  const y = nowLocal.getUTCFullYear();
+  const m = nowLocal.getUTCMonth();
+  const d = nowLocal.getUTCDate();
+
+  const endLocalAsUtcMs = Date.UTC(y, m, d, endHourLocal, 0, 0, 0);
+  const endPeriod = new Date(endLocalAsUtcMs - tzOffsetMinutes * 60 * 1000);
+  const startPeriod = new Date(endPeriod.getTime() - 24 * 60 * 60 * 1000);
+
+  return { startPeriod, endPeriod };
 }
 
 export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
@@ -424,11 +457,11 @@ export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
       rowNumber: index + 2,
       room,
       chatId,
-      start: formatDateTimeLabel(start),
-      end: end ? formatDateTimeLabel(end) : "",
+      start: formatDateTimeLabel(start, tzOffsetMinutes),
+      end: end ? formatDateTimeLabel(end, tzOffsetMinutes) : "",
       duration,
       status,
-      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen) : "",
+      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen, tzOffsetMinutes) : "",
       wifiSignal,
       startIso: start.toISOString(),
       endIso: end ? end.toISOString() : "",
@@ -464,7 +497,7 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
   const canonicalChatId = resolveCanonicalRawChatId(chatId);
   if (!canonicalChatId) {
     return {
-      dateLabel: formatDateLabel(new Date()),
+      dateLabel: formatDateLabel(new Date(), 420),
       totalMinutes: 0,
       rooms: [],
     };
@@ -482,12 +515,7 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
 
   const rows = response.data.values || [];
 
-  const now = new Date();
-  const endPeriod = new Date(now);
-  endPeriod.setHours(6, 0, 0, 0);
-
-  const startPeriod = new Date(endPeriod);
-  startPeriod.setDate(startPeriod.getDate() - 1);
+  const { startPeriod, endPeriod } = getDailyWindowBySheetOffset(tzOffsetMinutes);
 
   const byRoom: Record<string, Array<{ start: Date; end: Date }>> = {};
 
@@ -534,7 +562,7 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
   rooms.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
   return {
-    dateLabel: formatDateLabel(startPeriod),
+    dateLabel: formatDateLabel(startPeriod, tzOffsetMinutes),
     totalMinutes: rooms.reduce((sum, room) => sum + room.totalMinutes, 0),
     rooms,
   };
@@ -543,18 +571,14 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
 export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugData> {
   const canonicalChatId = resolveCanonicalRawChatId(chatId);
 
-  const now = new Date();
-  const endPeriod = new Date(now);
-  endPeriod.setHours(6, 0, 0, 0);
-
-  const startPeriod = new Date(endPeriod);
-  startPeriod.setDate(startPeriod.getDate() - 1);
+  const { tzOffsetMinutes } = getSheetsConfig();
+  const { startPeriod, endPeriod } = getDailyWindowBySheetOffset(tzOffsetMinutes);
 
   if (!canonicalChatId) {
     return {
-      dateLabel: formatDateLabel(startPeriod),
-      windowStart: formatDateTimeLabel(startPeriod),
-      windowEnd: formatDateTimeLabel(endPeriod),
+      dateLabel: formatDateLabel(startPeriod, tzOffsetMinutes),
+      windowStart: formatDateTimeLabel(startPeriod, tzOffsetMinutes),
+      windowEnd: formatDateTimeLabel(endPeriod, tzOffsetMinutes),
       windowStartIso: startPeriod.toISOString(),
       windowEndIso: endPeriod.toISOString(),
       totalMinutes: 0,
@@ -563,7 +587,7 @@ export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugD
     };
   }
 
-  const { spreadsheetId, activitySheetName, tzOffsetMinutes } = getSheetsConfig();
+  const { spreadsheetId, activitySheetName } = getSheetsConfig();
   const sheets = await getSheetsClient();
 
   const response = await sheets.spreadsheets.values.get({
@@ -604,13 +628,13 @@ export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugD
 
     rawRows.push({
       room,
-      start: formatDateTimeLabel(start),
-      end: formatDateTimeLabel(end),
+      start: formatDateTimeLabel(start, tzOffsetMinutes),
+      end: formatDateTimeLabel(end, tzOffsetMinutes),
       startIso: start.toISOString(),
       endIso: end.toISOString(),
       status,
       duration,
-      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen) : "",
+      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen, tzOffsetMinutes) : "",
     });
   }
 
@@ -631,8 +655,8 @@ export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugD
     const mergedSessions = merged.map((session) => {
       const minutes = Math.floor((session.end.getTime() - session.start.getTime()) / 60000);
       return {
-        start: formatDateTimeLabel(session.start),
-        end: formatDateTimeLabel(session.end),
+        start: formatDateTimeLabel(session.start, tzOffsetMinutes),
+        end: formatDateTimeLabel(session.end, tzOffsetMinutes),
         startIso: session.start.toISOString(),
         endIso: session.end.toISOString(),
         minutes,
@@ -651,12 +675,12 @@ export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugD
 
   rooms.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
-  rawRows.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  rawRows.sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
 
   return {
-    dateLabel: formatDateLabel(startPeriod),
-    windowStart: formatDateTimeLabel(startPeriod),
-    windowEnd: formatDateTimeLabel(endPeriod),
+    dateLabel: formatDateLabel(startPeriod, tzOffsetMinutes),
+    windowStart: formatDateTimeLabel(startPeriod, tzOffsetMinutes),
+    windowEnd: formatDateTimeLabel(endPeriod, tzOffsetMinutes),
     windowStartIso: startPeriod.toISOString(),
     windowEndIso: endPeriod.toISOString(),
     totalMinutes: rooms.reduce((sum, room) => sum + room.totalMinutes, 0),
