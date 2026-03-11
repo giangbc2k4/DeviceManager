@@ -1,4 +1,5 @@
 import { getDailyDebugByChatId } from "@/lib/google-sheets";
+import TimelineScroll from "./timeline-scroll";
 
 type ReportViewProps = {
   chatId: string;
@@ -31,8 +32,8 @@ export default async function ReportView({ chatId }: ReportViewProps) {
   });
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7e8c8,_#efe8dc_35%,_#d8d0c1_100%)] px-6 py-10 text-stone-900">
-      <div className="mx-auto max-w-5xl rounded-[32px] border border-stone-900/10 bg-white/80 p-8 shadow-[0_20px_80px_rgba(60,40,10,0.12)] backdrop-blur">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7e8c8,_#efe8dc_35%,_#d8d0c1_100%)] px-2 py-4 md:px-6 md:py-10 text-stone-900">
+      <div className="mx-auto max-w-5xl rounded-[32px] border border-stone-900/10 bg-white/80 p-4 md:p-8 shadow-[0_20px_80px_rgba(60,40,10,0.12)] backdrop-blur">
         <div className="flex flex-col gap-3 border-b border-stone-200 pb-6">
           <p className="text-xs uppercase tracking-[0.35em] text-amber-700">Device Manager</p>
           <h1 className="text-3xl font-semibold">Báo cáo hoạt động</h1>
@@ -70,7 +71,7 @@ export default async function ReportView({ chatId }: ReportViewProps) {
           ) : null}
 
           {hasRoomData ? (
-            <div className="mt-5 overflow-x-auto rounded-xl border border-stone-200 p-4">
+            <TimelineScroll className="mt-5 overflow-x-auto rounded-xl border border-stone-200 p-4">
               <div className="min-w-[820px]">
                 <div
                   className="ml-[130px] mb-2 grid text-[11px] font-semibold text-stone-500"
@@ -87,7 +88,7 @@ export default async function ReportView({ chatId }: ReportViewProps) {
                   {debug.rooms.map((room) => (
                     <div className="grid grid-cols-[120px_1fr] items-center gap-3" key={`timeline-${room.room}`}>
                       <div>
-                        <p className="truncate text-sm font-semibold text-stone-900">Phòng {room.room}</p>
+                        <p className="truncate text-sm font-semibold text-stone-900">{room.room}</p>
                         <p className="text-xs text-stone-500">{room.count} lượt • {room.totalMinutes} phút</p>
                       </div>
 
@@ -124,7 +125,7 @@ export default async function ReportView({ chatId }: ReportViewProps) {
                   ))}
                 </div>
               </div>
-            </div>
+            </TimelineScroll>
           ) : null}
 
           {hasRoomData ? (

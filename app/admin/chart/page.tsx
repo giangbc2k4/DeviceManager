@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { isAuthenticated } from "@/lib/auth";
 import { getDailyDebugByChatId } from "@/lib/google-sheets";
+import TimelineScroll from "@/app/report/timeline-scroll";
 
 type ChartPageProps = {
   searchParams?: Promise<{
@@ -89,7 +90,7 @@ export default async function AdminChartPage({ searchParams }: ChartPageProps) {
             <p className="mt-2 break-all text-lg font-semibold">{hasChatId ? chatId : "Chưa nhập"}</p>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Tổng thời lượng hôm qua</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Tổng thời lượng</p>
             <p className="mt-2 text-2xl font-extrabold text-orange-600">{formatHours(debug.totalMinutes)}</p>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-4">
@@ -119,7 +120,7 @@ export default async function AdminChartPage({ searchParams }: ChartPageProps) {
           ) : null}
 
           {hasRoomData ? (
-            <div className="mt-5 overflow-x-auto rounded-xl border border-stone-200 p-4">
+            <TimelineScroll className="mt-5 overflow-x-auto rounded-xl border border-stone-200 p-4">
               <div className="min-w-[820px]">
                 <div
                   className="ml-[130px] mb-2 grid text-[11px] font-semibold text-stone-500"
@@ -136,7 +137,7 @@ export default async function AdminChartPage({ searchParams }: ChartPageProps) {
                   {debug.rooms.map((room) => (
                     <div className="grid grid-cols-[120px_1fr] items-center gap-3" key={`timeline-${room.room}`}>
                       <div>
-                        <p className="truncate text-sm font-semibold text-stone-900">Phòng {room.room}</p>
+                        <p className="truncate text-sm font-semibold text-stone-900">{room.room}</p>
                         <p className="text-xs text-stone-500">{room.count} lượt • {room.totalMinutes} phút</p>
                       </div>
 
@@ -174,7 +175,7 @@ export default async function AdminChartPage({ searchParams }: ChartPageProps) {
                   ))}
                 </div>
               </div>
-            </div>
+            </TimelineScroll>
           ) : null}
 
           {hasRoomData ? (
