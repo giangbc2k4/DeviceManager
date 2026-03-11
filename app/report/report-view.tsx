@@ -41,7 +41,7 @@ export default async function ReportView({ chatId }: ReportViewProps) {
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-stone-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Tổng thời lượng hôm qua</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Tổng thời lượng</p>
             <p className="mt-2 text-2xl font-extrabold text-orange-600">{formatHours(debug.totalMinutes)}</p>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-4">
