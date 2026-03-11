@@ -1,0 +1,666 @@
+import { google } from "googleapis";
+
+const CHAT_ID_MAP: Record<string, string> = {
+  "-5021046267": "-1003686987675",
+};
+
+export type DeviceRow = {
+  rowNumber: number;
+  mac: string;
+  room: string;
+  status: string;
+  license: string;
+  startDate: string;
+  expireDate: string;
+};
+
+export type DailyRoomSummary = {
+  room: string;
+  totalMinutes: number;
+  count: number;
+};
+
+export type DailyChartData = {
+  dateLabel: string;
+  totalMinutes: number;
+  rooms: DailyRoomSummary[];
+};
+
+export type DailyDebugData = {
+  dateLabel: string;
+  windowStart: string;
+  windowEnd: string;
+  windowStartIso: string;
+  windowEndIso: string;
+  totalMinutes: number;
+  rooms: Array<{
+    room: string;
+    count: number;
+    totalMinutes: number;
+    mergedSessions: Array<{
+      start: string;
+      end: string;
+      startIso: string;
+      endIso: string;
+      minutes: number;
+    }>;
+  }>;
+  rawRows: Array<{
+    room: string;
+    start: string;
+    end: string;
+    startIso: string;
+    endIso: string;
+    status: string;
+    duration: string;
+    lastSeen: string;
+  }>;
+};
+
+export type Sheet1SessionRow = {
+  rowNumber: number;
+  room: string;
+  chatId: string;
+  start: string;
+  end: string;
+  duration: string;
+  status: string;
+  lastSeen: string;
+  wifiSignal: string;
+  startIso: string;
+  endIso: string;
+  minutes: number;
+};
+
+export type Sheet1DayGroup = {
+  dateKey: string;
+  dateLabel: string;
+  totalSessions: number;
+  totalMinutes: number;
+  rows: Sheet1SessionRow[];
+};
+
+function getRequiredEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function getSheetsConfig() {
+  return {
+    spreadsheetId: getRequiredEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
+    sheetName: process.env.GOOGLE_SHEETS_DEVICE_SHEET || "MAC_REGISTRY",
+    activitySheetName: process.env.GOOGLE_SHEETS_ACTIVITY_SHEET || "Sheet1",
+    tzOffsetMinutes: Number(process.env.GOOGLE_SHEETS_TZ_OFFSET_MINUTES || "420"),
+    clientEmail: getRequiredEnv("GOOGLE_SHEETS_CLIENT_EMAIL"),
+    privateKey: getRequiredEnv("GOOGLE_SHEETS_PRIVATE_KEY").replace(/\\n/g, "\n"),
+  };
+}
+
+async function getSheetsClient() {
+  const { clientEmail, privateKey } = getSheetsConfig();
+
+  const auth = new google.auth.JWT({
+    email: clientEmail,
+    key: privateKey,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  await auth.authorize();
+
+  return google.sheets({ version: "v4", auth });
+}
+
+async function getSheetId(
+  sheets: Awaited<ReturnType<typeof getSheetsClient>>,
+  spreadsheetId: string,
+  sheetName: string,
+) {
+  const metadata = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title))",
+  });
+
+  const sheet = metadata.data.sheets?.find(
+    (item) => item.properties?.title === sheetName,
+  );
+
+  const sheetId = sheet?.properties?.sheetId;
+
+  if (sheetId === undefined) {
+    throw new Error("Device sheet not found");
+  }
+
+  return sheetId;
+}
+
+function toText(value: unknown) {
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+function resolveCanonicalRawChatId(chatId: string) {
+  const base = toText(chatId);
+  if (!base) return "";
+
+  // If input is already a source key, keep it.
+  if (CHAT_ID_MAP[base]) {
+    return base;
+  }
+
+  // If input is a destination id, map back to its source key.
+  for (const key of Object.keys(CHAT_ID_MAP)) {
+    if (CHAT_ID_MAP[key] === base) {
+      return key;
+    }
+  }
+
+  // No mapping rule: use input as-is.
+  return base;
+}
+
+async function findDeviceByMac(mac: string) {
+  const normalizedMac = toText(mac).toUpperCase();
+
+  if (!normalizedMac) {
+    throw new Error("Missing MAC address");
+  }
+
+  const devices = await listDevices();
+  const target = devices.find((device) => device.mac.toUpperCase() === normalizedMac);
+
+  if (!target) {
+    throw new Error("Device not found");
+  }
+
+  return target;
+}
+
+export async function listDevices(): Promise<DeviceRow[]> {
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A2:F`,
+  });
+
+  const rows = response.data.values || [];
+
+  return rows
+    .map((row, index) => ({
+      rowNumber: index + 2,
+      mac: toText(row[0]),
+      room: toText(row[1]),
+      status: toText(row[2]),
+      license: toText(row[3]),
+      startDate: toText(row[4]),
+      expireDate: toText(row[5]),
+    }))
+    .filter((row) => row.mac !== "");
+}
+
+export async function toggleDeviceLock(mac: string) {
+  const target = await findDeviceByMac(mac);
+
+  if ((target.license || "").toUpperCase() === "LIFETIME") {
+    throw new Error("Thiết bị LIFETIME không áp dụng khóa/mở khóa");
+  }
+
+  const nextStatus = target.status === "LOCKED" ? "ACTIVE" : "LOCKED";
+
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!C${target.rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[nextStatus]],
+    },
+  });
+
+  return { mac: target.mac, status: nextStatus };
+}
+
+export async function updateDeviceLicense(mac: string, license: string) {
+  const normalizedLicense = toText(license).toUpperCase();
+
+  if (!["TRIAL", "LIFETIME"].includes(normalizedLicense)) {
+    throw new Error("Invalid license value");
+  }
+
+  const target = await findDeviceByMac(mac);
+
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const data: Array<{ range: string; values: string[][] }> = [{
+    range: `${sheetName}!D${target.rowNumber}`,
+    values: [[normalizedLicense]],
+  }];
+
+  // LIFETIME luôn ở trạng thái hoạt động, không cho khóa.
+  if (normalizedLicense === "LIFETIME") {
+    data.push({
+      range: `${sheetName}!C${target.rowNumber}`,
+      values: [["ACTIVE"]],
+    });
+  }
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "RAW",
+      data: data.map((item) => ({
+        range: item.range,
+        values: item.values,
+      })),
+    },
+  });
+
+  return { mac: target.mac, license: normalizedLicense };
+}
+
+export async function deleteDevice(mac: string) {
+  const target = await findDeviceByMac(mac);
+
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+  const sheetId = await getSheetId(sheets, spreadsheetId, sheetName);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: target.rowNumber - 1,
+              endIndex: target.rowNumber,
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  return { mac: target.mac, deleted: true };
+}
+
+function mergeSessions(
+  sessions: Array<{ start: Date; end: Date }>,
+  gapLimitMs: number,
+  minDurationMs: number,
+) {
+  if (sessions.length === 0) return [];
+
+  const sorted = [...sessions].sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const merged: Array<{ start: Date; end: Date }> = [];
+  let current = { ...sorted[0] };
+
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+    const gap = next.start.getTime() - current.end.getTime();
+
+    if (gap <= gapLimitMs) {
+      if (next.end.getTime() > current.end.getTime()) {
+        current.end = new Date(next.end);
+      }
+      continue;
+    }
+
+    if (current.end.getTime() - current.start.getTime() >= minDurationMs) {
+      merged.push(current);
+    }
+
+    current = { ...next };
+  }
+
+  if (current.end.getTime() - current.start.getTime() >= minDurationMs) {
+    merged.push(current);
+  }
+
+  return merged;
+}
+
+function formatDateLabel(date: Date) {
+  return date.toLocaleDateString("vi-VN");
+}
+
+function formatDateTimeLabel(date: Date) {
+  return date.toLocaleString("vi-VN");
+}
+
+function parseSheetDate(value: unknown, tzOffsetMinutes = 0) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    // SERIAL_NUMBER is a sheet-local datetime; convert to UTC by removing sheet offset.
+    return new Date(excelEpoch + value * 24 * 60 * 60 * 1000 - tzOffsetMinutes * 60 * 1000);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const text = value.trim();
+    const m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+
+    if (m) {
+      const day = Number(m[1]);
+      const month = Number(m[2]) - 1;
+      const year = Number(m[3]);
+      const hour = Number(m[4]);
+      const minute = Number(m[5]);
+      const second = Number(m[6] || "0");
+      const parsed = new Date(year, month, day, hour, minute, second);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+
+    const fallback = new Date(text);
+    if (!isNaN(fallback.getTime())) return fallback;
+  }
+
+  return null;
+}
+
+function getSheetLocalDateKey(date: Date, tzOffsetMinutes: number) {
+  const shifted = new Date(date.getTime() + tzOffsetMinutes * 60 * 1000);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateLabelFromKey(dateKey: string) {
+  const [y, m, d] = dateKey.split("-").map((x) => Number(x));
+  if (!y || !m || !d) return dateKey;
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
+  const { spreadsheetId, activitySheetName, tzOffsetMinutes } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${activitySheetName}!A2:H`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+    dateTimeRenderOption: "SERIAL_NUMBER",
+  });
+
+  const rows = response.data.values || [];
+  const grouped: Record<string, Sheet1SessionRow[]> = {};
+
+  rows.forEach((row, index) => {
+    const room = toText(row[0]);
+    const chatId = toText(row[1]);
+    const startRaw = row[2];
+    const endRaw = row[3];
+    const duration = toText(row[4]);
+    const status = toText(row[5]);
+    const lastSeenRaw = row[6];
+    const wifiSignal = toText(row[7]);
+
+    const start = parseSheetDate(startRaw, tzOffsetMinutes);
+    const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : null;
+    const lastSeen = lastSeenRaw ? parseSheetDate(lastSeenRaw, tzOffsetMinutes) : null;
+
+    if (!room || !start) return;
+
+    const dateKey = getSheetLocalDateKey(start, tzOffsetMinutes);
+    const minutes = end ? Math.max(Math.floor((end.getTime() - start.getTime()) / 60000), 0) : 0;
+
+    const mappedRow: Sheet1SessionRow = {
+      rowNumber: index + 2,
+      room,
+      chatId,
+      start: formatDateTimeLabel(start),
+      end: end ? formatDateTimeLabel(end) : "",
+      duration,
+      status,
+      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen) : "",
+      wifiSignal,
+      startIso: start.toISOString(),
+      endIso: end ? end.toISOString() : "",
+      minutes,
+    };
+
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = [];
+    }
+
+    grouped[dateKey].push(mappedRow);
+  });
+
+  return Object.keys(grouped)
+    .sort((a, b) => (a < b ? 1 : -1))
+    .map((dateKey) => {
+      const dayRows = grouped[dateKey].sort(
+        (a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime(),
+      );
+      const totalMinutes = dayRows.reduce((sum, item) => sum + item.minutes, 0);
+
+      return {
+        dateKey,
+        dateLabel: formatDateLabelFromKey(dateKey),
+        totalSessions: dayRows.length,
+        totalMinutes,
+        rows: dayRows,
+      };
+    });
+}
+
+export async function getDailyChartByChatId(chatId: string): Promise<DailyChartData> {
+  const canonicalChatId = resolveCanonicalRawChatId(chatId);
+  if (!canonicalChatId) {
+    return {
+      dateLabel: formatDateLabel(new Date()),
+      totalMinutes: 0,
+      rooms: [],
+    };
+  }
+
+  const { spreadsheetId, activitySheetName, tzOffsetMinutes } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${activitySheetName}!A2:H`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+    dateTimeRenderOption: "SERIAL_NUMBER",
+  });
+
+  const rows = response.data.values || [];
+
+  const now = new Date();
+  const endPeriod = new Date(now);
+  endPeriod.setHours(6, 0, 0, 0);
+
+  const startPeriod = new Date(endPeriod);
+  startPeriod.setDate(startPeriod.getDate() - 1);
+
+  const byRoom: Record<string, Array<{ start: Date; end: Date }>> = {};
+
+  for (const row of rows) {
+    const room = toText(row[0]);
+    const rowChatId = toText(row[1]);
+    const startRaw = row[2];
+    const endRaw = row[3];
+
+    if (!room || !rowChatId || !startRaw) continue;
+    if (rowChatId !== canonicalChatId) continue;
+
+    const start = parseSheetDate(startRaw, tzOffsetMinutes);
+    const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : endPeriod;
+
+    if (!start || !end) continue;
+    if (end < startPeriod || start > endPeriod) continue;
+
+    const realStart = start < startPeriod ? startPeriod : start;
+    const realEnd = end > endPeriod ? endPeriod : end;
+
+    if (!byRoom[room]) byRoom[room] = [];
+    byRoom[room].push({ start: realStart, end: realEnd });
+  }
+
+  const GAP_LIMIT = 10 * 60 * 1000;
+  const MIN_DURATION = 10 * 60 * 1000;
+
+  const rooms: DailyRoomSummary[] = [];
+
+  Object.keys(byRoom).forEach((room) => {
+    const merged = mergeSessions(byRoom[room], GAP_LIMIT, MIN_DURATION);
+    if (merged.length === 0) return;
+
+    const totalMs = merged.reduce((sum, session) => sum + (session.end.getTime() - session.start.getTime()), 0);
+
+    rooms.push({
+      room,
+      totalMinutes: Math.floor(totalMs / 60000),
+      count: merged.length,
+    });
+  });
+
+  rooms.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  return {
+    dateLabel: formatDateLabel(startPeriod),
+    totalMinutes: rooms.reduce((sum, room) => sum + room.totalMinutes, 0),
+    rooms,
+  };
+}
+
+export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugData> {
+  const canonicalChatId = resolveCanonicalRawChatId(chatId);
+
+  const now = new Date();
+  const endPeriod = new Date(now);
+  endPeriod.setHours(6, 0, 0, 0);
+
+  const startPeriod = new Date(endPeriod);
+  startPeriod.setDate(startPeriod.getDate() - 1);
+
+  if (!canonicalChatId) {
+    return {
+      dateLabel: formatDateLabel(startPeriod),
+      windowStart: formatDateTimeLabel(startPeriod),
+      windowEnd: formatDateTimeLabel(endPeriod),
+      windowStartIso: startPeriod.toISOString(),
+      windowEndIso: endPeriod.toISOString(),
+      totalMinutes: 0,
+      rooms: [],
+      rawRows: [],
+    };
+  }
+
+  const { spreadsheetId, activitySheetName, tzOffsetMinutes } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${activitySheetName}!A2:H`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+    dateTimeRenderOption: "SERIAL_NUMBER",
+  });
+
+  const rows = response.data.values || [];
+  const byRoom: Record<string, Array<{ start: Date; end: Date }>> = {};
+  const rawRows: DailyDebugData["rawRows"] = [];
+
+  for (const row of rows) {
+    const room = toText(row[0]);
+    const rowChatId = toText(row[1]);
+    const startRaw = row[2];
+    const endRaw = row[3];
+    const duration = toText(row[4]);
+    const status = toText(row[5]);
+    const lastSeenRaw = row[6];
+
+    if (!room || !rowChatId || !startRaw) continue;
+    if (rowChatId !== canonicalChatId) continue;
+
+    const start = parseSheetDate(startRaw, tzOffsetMinutes);
+    const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : endPeriod;
+    const lastSeen = lastSeenRaw ? parseSheetDate(lastSeenRaw, tzOffsetMinutes) : null;
+
+    if (!start || !end) continue;
+    if (end < startPeriod || start > endPeriod) continue;
+
+    const realStart = start < startPeriod ? startPeriod : start;
+    const realEnd = end > endPeriod ? endPeriod : end;
+
+    if (!byRoom[room]) byRoom[room] = [];
+    byRoom[room].push({ start: realStart, end: realEnd });
+
+    rawRows.push({
+      room,
+      start: formatDateTimeLabel(start),
+      end: formatDateTimeLabel(end),
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
+      status,
+      duration,
+      lastSeen: lastSeen ? formatDateTimeLabel(lastSeen) : "",
+    });
+  }
+
+  const GAP_LIMIT = 10 * 60 * 1000;
+  const MIN_DURATION = 10 * 60 * 1000;
+
+  const rooms: DailyDebugData["rooms"] = [];
+
+  Object.keys(byRoom).forEach((room) => {
+    const merged = mergeSessions(byRoom[room], GAP_LIMIT, MIN_DURATION);
+    if (merged.length === 0) return;
+
+    const totalMs = merged.reduce(
+      (sum, session) => sum + (session.end.getTime() - session.start.getTime()),
+      0,
+    );
+
+    const mergedSessions = merged.map((session) => {
+      const minutes = Math.floor((session.end.getTime() - session.start.getTime()) / 60000);
+      return {
+        start: formatDateTimeLabel(session.start),
+        end: formatDateTimeLabel(session.end),
+        startIso: session.start.toISOString(),
+        endIso: session.end.toISOString(),
+        minutes,
+      };
+    });
+
+    const totalMinutes = Math.floor(totalMs / 60000);
+
+    rooms.push({
+      room,
+      count: mergedSessions.length,
+      totalMinutes,
+      mergedSessions,
+    });
+  });
+
+  rooms.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  rawRows.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+  return {
+    dateLabel: formatDateLabel(startPeriod),
+    windowStart: formatDateTimeLabel(startPeriod),
+    windowEnd: formatDateTimeLabel(endPeriod),
+    windowStartIso: startPeriod.toISOString(),
+    windowEndIso: endPeriod.toISOString(),
+    totalMinutes: rooms.reduce((sum, room) => sum + room.totalMinutes, 0),
+    rooms,
+    rawRows,
+  };
+}
