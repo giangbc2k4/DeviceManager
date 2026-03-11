@@ -34,3 +34,32 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deployment (Vercel)
+
+1. Import this repository to Vercel.
+2. Framework preset: Next.js (auto-detected).
+3. Build command: `npm run build`.
+4. Output directory: leave default for Next.js.
+5. Add all environment variables from `.env.example` in Vercel Project Settings -> Environment Variables.
+
+### Required Environment Variables
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+- `GOOGLE_SHEETS_SPREADSHEET_ID`
+- `GOOGLE_SHEETS_CLIENT_EMAIL`
+- `GOOGLE_SHEETS_PRIVATE_KEY`
+
+### Optional Environment Variables
+
+- `GOOGLE_SHEETS_DEVICE_SHEET` (default: `MAC_REGISTRY`)
+- `GOOGLE_SHEETS_ACTIVITY_SHEET` (default: `Sheet1`)
+- `GOOGLE_SHEETS_TZ_OFFSET_MINUTES` (default: `420`)
+
+### Private Key Format
+
+Set `GOOGLE_SHEETS_PRIVATE_KEY` as one line with `\n` characters, for example:
+
+`"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"`
