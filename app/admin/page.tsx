@@ -22,8 +22,8 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7e8c8,_#efe8dc_35%,_#d8d0c1_100%)] px-6 py-10 text-stone-900">
-      <div className="mx-auto max-w-5xl rounded-[32px] border border-stone-900/10 bg-white/80 p-8 shadow-[0_20px_80px_rgba(60,40,10,0.12)] backdrop-blur">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7e8c8,_#efe8dc_35%,_#d8d0c1_100%)] px-2 py-4 md:px-6 md:py-10 text-stone-900">
+      <div className="mx-auto max-w-5xl rounded-[32px] border border-stone-900/10 bg-white/80 p-4 md:p-8 shadow-[0_20px_80px_rgba(60,40,10,0.12)] backdrop-blur">
         <div className="flex flex-col gap-4 border-b border-stone-200 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-amber-700">Device Manager</p>
