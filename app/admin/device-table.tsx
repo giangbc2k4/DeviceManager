@@ -12,6 +12,28 @@ type DeviceTableProps = {
 export function DeviceTable({ devices }: DeviceTableProps) {
   const router = useRouter();
   const [busyMac, setBusyMac] = useState<string>("");
+  const [editingExpire, setEditingExpire] = useState<string>("");
+
+  function formatSheetDate(date: Date) {
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+
+  function addDaysFromNow(days: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return formatSheetDate(date);
+  }
+
+  // yyyy-MM-dd → dd/MM/yyyy
+  function toSheetDate(isoDate: string) {
+    const parts = isoDate.split("-");
+    if (parts.length !== 3) return "";
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -70,6 +92,33 @@ export function DeviceTable({ devices }: DeviceTableProps) {
       alert("Không thể kết nối tới máy chủ");
     } finally {
       setBusyMac("");
+    }
+  }
+
+  async function handleChangeExpireDate(mac: string, newExpireDate: string) {
+    if (!newExpireDate) return;
+
+    setBusyMac(mac);
+
+    try {
+      const response = await fetch("/api/devices/expire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mac, expireDate: newExpireDate }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        alert(payload.message || "Không thể cập nhật ngày hết hạn");
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      alert("Không thể kết nối tới máy chủ");
+    } finally {
+      setBusyMac("");
+      setEditingExpire("");
     }
   }
 
@@ -178,21 +227,68 @@ export function DeviceTable({ devices }: DeviceTableProps) {
                   </div>
                 </td>
                 <td className="px-4 py-3">{device.startDate || "-"}</td>
-                <td className="px-4 py-3">{device.expireDate || "-"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className="text-stone-700">{device.expireDate || "-"}</span>
+                    {editingExpire === device.mac ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {[
+                          { label: "+7d", days: 7 },
+                          { label: "+30d", days: 30 },
+                          { label: "+90d", days: 90 },
+                          { label: "+1y", days: 365 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.days}
+                            type="button"
+                            className="rounded bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-200 disabled:opacity-50"
+                            disabled={isBusy}
+                            onClick={() => handleChangeExpireDate(device.mac, addDaysFromNow(preset.days))}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                        <input
+                          type="date"
+                          className="rounded border border-stone-300 px-1.5 py-0.5 text-[11px]"
+                          disabled={isBusy}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleChangeExpireDate(device.mac, toSheetDate(e.target.value));
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="rounded bg-stone-200 px-1.5 py-0.5 text-[11px] text-stone-600 hover:bg-stone-300"
+                          onClick={() => setEditingExpire("")}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="rounded bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500 hover:bg-stone-200"
+                        onClick={() => setEditingExpire(device.mac)}
+                      >
+                        Sửa ngày
+                      </button>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
-                    {!isLifetime ? (
-                      <button
-                        className={`rounded-full px-4 py-2 text-xs font-semibold text-white ${
-                          isLocked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
-                        } disabled:cursor-not-allowed disabled:bg-stone-400`}
-                        disabled={isBusy}
-                        onClick={() => handleToggle(device.mac)}
-                        type="button"
-                      >
-                        {isBusy ? "Đang xử lý..." : isLocked ? "Mở khóa" : "Khóa"}
-                      </button>
-                    ) : null}
+                    <button
+                      className={`rounded-full px-4 py-2 text-xs font-semibold text-white ${
+                        isLocked ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                      } disabled:cursor-not-allowed disabled:bg-stone-400`}
+                      disabled={isBusy}
+                      onClick={() => handleToggle(device.mac)}
+                      type="button"
+                    >
+                      {isBusy ? "Đang xử lý..." : isLocked ? "Mở khóa" : "Khóa"}
+                    </button>
                     <button
                       className="rounded-full bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-stone-400"
                       disabled={isBusy}

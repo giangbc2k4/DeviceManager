@@ -207,11 +207,33 @@ export async function listDevices(): Promise<DeviceRow[]> {
 export async function toggleDeviceLock(mac: string) {
   const target = await findDeviceByMac(mac);
 
-  if ((target.license || "").toUpperCase() === "LIFETIME") {
-    throw new Error("Thiết bị LIFETIME không áp dụng khóa/mở khóa");
-  }
+  const action = target.status === "LOCKED" ? "UNLOCK" : "LOCK";
+  const nextStatus = action === "LOCK" ? "LOCKED" : "ACTIVE";
 
-  const nextStatus = target.status === "LOCKED" ? "ACTIVE" : "LOCKED";
+  const appsScriptUrl = process.env.APPS_SCRIPT_URL;
+
+  if (appsScriptUrl) {
+    const res = await fetch(appsScriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, mac: target.mac }),
+      redirect: "follow",
+    });
+
+    const text = await res.text();
+    let result: { error?: string; newStatus?: string };
+    try {
+      result = JSON.parse(text);
+    } catch {
+      throw new Error("Apps Script returned invalid response");
+    }
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return { mac: target.mac, status: result.newStatus ?? nextStatus };
+  }
 
   const { spreadsheetId, sheetName } = getSheetsConfig();
   const sheets = await getSheetsClient();
@@ -245,14 +267,6 @@ export async function updateDeviceLicense(mac: string, license: string) {
     values: [[normalizedLicense]],
   }];
 
-  // LIFETIME luôn ở trạng thái hoạt động, không cho khóa.
-  if (normalizedLicense === "LIFETIME") {
-    data.push({
-      range: `${sheetName}!C${target.rowNumber}`,
-      values: [["ACTIVE"]],
-    });
-  }
-
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
     requestBody: {
@@ -265,6 +279,24 @@ export async function updateDeviceLicense(mac: string, license: string) {
   });
 
   return { mac: target.mac, license: normalizedLicense };
+}
+
+export async function updateExpireDate(mac: string, expireDate: string) {
+  const target = await findDeviceByMac(mac);
+
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!F${target.rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[expireDate]],
+    },
+  });
+
+  return { mac: target.mac, expireDate };
 }
 
 export async function deleteDevice(mac: string) {
