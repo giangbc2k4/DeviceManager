@@ -437,7 +437,40 @@ function formatDateLabelFromKey(dateKey: string) {
   return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
 }
 
-function getDailyWindowBySheetOffset(tzOffsetMinutes: number, endHourLocal = 6) {
+function parseDateParam(dateStr: string): { day: number; month: number; year: number } | null {
+  const m = dateStr.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (!m) return null;
+  return { day: Number(m[1]), month: Number(m[2]), year: Number(m[3]) };
+}
+
+export function getDefaultReportDate(): string {
+  const { tzOffsetMinutes } = getSheetsConfig();
+  const endHourLocal = 6;
+  const nowUtc = Date.now();
+  const nowLocal = new Date(nowUtc + tzOffsetMinutes * 60 * 1000);
+
+  const y = nowLocal.getUTCFullYear();
+  const m = nowLocal.getUTCMonth();
+  const d = nowLocal.getUTCDate();
+
+  const endLocalAsUtcMs = Date.UTC(y, m, d, endHourLocal, 0, 0, 0);
+  const endPeriod = new Date(endLocalAsUtcMs - tzOffsetMinutes * 60 * 1000);
+  const startPeriod = new Date(endPeriod.getTime() - 24 * 60 * 60 * 1000);
+
+  return formatDateLabel(startPeriod, tzOffsetMinutes);
+}
+
+function getDailyWindowBySheetOffset(tzOffsetMinutes: number, endHourLocal = 6, targetDate?: string) {
+  if (targetDate) {
+    const parsed = parseDateParam(targetDate);
+    if (parsed) {
+      const startLocalAsUtcMs = Date.UTC(parsed.year, parsed.month - 1, parsed.day, endHourLocal, 0, 0, 0);
+      const startPeriod = new Date(startLocalAsUtcMs - tzOffsetMinutes * 60 * 1000);
+      const endPeriod = new Date(startPeriod.getTime() + 24 * 60 * 60 * 1000);
+      return { startPeriod, endPeriod };
+    }
+  }
+
   const nowUtc = Date.now();
   const nowLocal = new Date(nowUtc + tzOffsetMinutes * 60 * 1000);
 
@@ -600,11 +633,11 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
   };
 }
 
-export async function getDailyDebugByChatId(chatId: string): Promise<DailyDebugData> {
+export async function getDailyDebugByChatId(chatId: string, reportDate?: string): Promise<DailyDebugData> {
   const canonicalChatId = resolveCanonicalRawChatId(chatId);
 
   const { tzOffsetMinutes } = getSheetsConfig();
-  const { startPeriod, endPeriod } = getDailyWindowBySheetOffset(tzOffsetMinutes);
+  const { startPeriod, endPeriod } = getDailyWindowBySheetOffset(tzOffsetMinutes, 6, reportDate);
 
   if (!canonicalChatId) {
     return {

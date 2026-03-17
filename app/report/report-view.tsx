@@ -3,6 +3,7 @@ import TimelineScroll from "./timeline-scroll";
 
 type ReportViewProps = {
   chatId: string;
+  reportDate: string;
 };
 
 function formatHours(minutes: number) {
@@ -15,10 +16,10 @@ function formatTimeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 }
 
-export default async function ReportView({ chatId }: ReportViewProps) {
+export default async function ReportView({ chatId, reportDate }: ReportViewProps) {
   const normalizedChatId = chatId.trim();
   const hasChatId = normalizedChatId.length > 0;
-  const debug = await getDailyDebugByChatId(normalizedChatId);
+  const debug = await getDailyDebugByChatId(normalizedChatId, reportDate);
   const windowStartMs = new Date(debug.windowStartIso).getTime();
   const windowEndMs = new Date(debug.windowEndIso).getTime();
   const windowDurationMs = Math.max(windowEndMs - windowStartMs, 1);
