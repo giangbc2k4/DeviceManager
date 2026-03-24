@@ -54,6 +54,12 @@ export default async function AdminPage() {
             >
               Xem toàn bộ phiên theo ngày
             </Link>
+            <Link
+              className="inline-flex rounded-full border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-600 hover:text-white hover:border-amber-600"
+              href="/admin/ota"
+            >
+              Quản lý OTA Firmware
+            </Link>
           </div>
         </div>
 

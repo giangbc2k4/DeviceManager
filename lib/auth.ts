@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const SESSION_COOKIE_NAME = "blink_admin_session";
+export const SESSION_EMAIL_COOKIE_NAME = "blink_admin_email";
 
 function getRequiredEnv(name: "ADMIN_EMAIL" | "ADMIN_PASSWORD" | "ADMIN_SESSION_SECRET") {
   const value = process.env[name];
@@ -55,4 +56,15 @@ export async function isAuthenticated() {
   }
 
   return safeCompare(sessionCookie, createSessionToken());
+}
+
+export async function getAuthenticatedAdminEmail() {
+  const authenticated = await isAuthenticated();
+  if (!authenticated) return null;
+
+  const cookieStore = await cookies();
+  const cookieEmail = cookieStore.get(SESSION_EMAIL_COOKIE_NAME)?.value?.trim();
+  if (cookieEmail) return cookieEmail;
+
+  return getAdminCredentials().email;
 }

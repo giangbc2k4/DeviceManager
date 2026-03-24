@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { createSessionToken, isValidLogin, SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+  createSessionToken,
+  isValidLogin,
+  SESSION_COOKIE_NAME,
+  SESSION_EMAIL_COOKIE_NAME,
+} from "@/lib/auth";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { email?: string; password?: string };
@@ -19,6 +24,16 @@ export async function POST(request: Request) {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: createSessionToken(),
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
+
+  response.cookies.set({
+    name: SESSION_EMAIL_COOKIE_NAME,
+    value: email,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

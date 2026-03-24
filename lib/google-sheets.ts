@@ -147,15 +147,15 @@ function resolveCanonicalRawChatId(chatId: string) {
   const base = toText(chatId);
   if (!base) return "";
 
-  // If input is already a source key, keep it.
+  // Source alias -> canonical destination.
   if (CHAT_ID_MAP[base]) {
-    return base;
+    return CHAT_ID_MAP[base];
   }
 
-  // If input is a destination id, map back to its source key.
+  // Destination ids remain canonical as-is.
   for (const key of Object.keys(CHAT_ID_MAP)) {
     if (CHAT_ID_MAP[key] === base) {
-      return key;
+      return base;
     }
   }
 
@@ -591,7 +591,7 @@ export async function getDailyChartByChatId(chatId: string): Promise<DailyChartD
     const endRaw = row[3];
 
     if (!room || !rowChatId || !startRaw) continue;
-    if (rowChatId !== canonicalChatId) continue;
+    if (resolveCanonicalRawChatId(rowChatId) !== canonicalChatId) continue;
 
     const start = parseSheetDate(startRaw, tzOffsetMinutes);
     const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : endPeriod;
@@ -676,7 +676,7 @@ export async function getDailyDebugByChatId(chatId: string, reportDate?: string)
     const lastSeenRaw = row[6];
 
     if (!room || !rowChatId || !startRaw) continue;
-    if (rowChatId !== canonicalChatId) continue;
+    if (resolveCanonicalRawChatId(rowChatId) !== canonicalChatId) continue;
 
     const start = parseSheetDate(startRaw, tzOffsetMinutes);
     const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : endPeriod;
