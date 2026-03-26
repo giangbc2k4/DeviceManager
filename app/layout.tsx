@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kinetic IoT - Device Manager",
+  title: "MicroBot - Device Manager",
   description: "Bảng điều khiển quản trị hệ thống IoT Device Manager",
 };
 

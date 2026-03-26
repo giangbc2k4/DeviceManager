@@ -32,9 +32,9 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
           <span className="material-symbols-outlined filled">dynamic_feed</span>
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tighter text-white">Kinetic IoT</h1>
+          <h1 className="text-xl font-semibold tracking-tighter text-white">MicroBot</h1>
           <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-            Management Suite
+            Device Manager
           </p>
         </div>
       </div>
@@ -48,16 +48,14 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-150 ${
-                active
-                  ? "bg-white/10 text-white scale-[0.98]"
-                  : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-150 ${active
+                ? "bg-white/10 text-white scale-[0.98]"
+                : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
+                }`}
             >
               <span
-                className={`material-symbols-outlined ${
-                  active ? "text-blue-400" : ""
-                }`}
+                className={`material-symbols-outlined ${active ? "text-blue-400" : ""
+                  }`}
               >
                 {item.icon}
               </span>
