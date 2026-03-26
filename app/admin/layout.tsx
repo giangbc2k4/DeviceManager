@@ -24,7 +24,7 @@ export default async function AdminLayout({
       <header className="sticky top-0 z-40 bg-[#f7f9fb]/80 backdrop-blur-md lg:ml-64">
         <div className="flex items-center justify-between h-16 px-4 lg:px-8">
           <div className="flex items-center gap-6 pl-12 lg:pl-0">
-            <span className="text-lg font-bold text-slate-900">Kinetic IoT</span>
+            <span className="text-lg font-bold text-slate-900">MicroBot</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative hidden md:block">

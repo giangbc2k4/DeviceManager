@@ -289,7 +289,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       {/* Upload Form */}
       <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
         <h2 className="mb-1 text-lg font-bold text-slate-900">Upload &amp; Release Firmware</h2>
-        <p className="mb-4 text-xs text-stone-500">
+        <p className="mb-4 text-xs text-slate-500">
           Upload sẽ đồng thời ghi vào <code>releases/latest/</code>, <code>releases/v&#x7B;version&#x7D;/</code> và cập nhật <code>version.json</code> trên GitHub.
         </p>
         <p className="mb-4 text-xs text-amber-700">
@@ -299,11 +299,11 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
         <form className="space-y-4" onSubmit={handleUpload}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="ota-version">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="ota-version">
                 Phiên bản <span className="text-red-500">*</span>
               </label>
               <input
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 disabled={uploading || !!rollbackVersion || !!deletingVersion}
                 id="ota-version"
                 onChange={(e) => setVersion(e.target.value)}
@@ -317,12 +317,12 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="ota-file">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="ota-file">
                 File firmware (.bin) <span className="text-red-500">*</span>
               </label>
               <input
                 accept=".bin"
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-stone-900 file:px-3 file:py-1 file:text-xs file:font-medium file:text-white focus:border-stone-900 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-800 file:px-4 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 disabled={uploading || !!rollbackVersion || !!deletingVersion}
                 id="ota-file"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
@@ -331,7 +331,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                 type="file"
               />
               {selectedFile && (
-                <p className="mt-1 text-xs text-stone-500">
+                <p className="mt-1.5 text-xs text-slate-500">
                   {selectedFile.name} — {formatBytes(selectedFile.size)}
                 </p>
               )}
@@ -339,11 +339,11 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="ota-note">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="ota-note">
               Ghi chú / Release note
             </label>
             <input
-              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               disabled={uploading || !!rollbackVersion || !!deletingVersion}
               id="ota-note"
               maxLength={200}
@@ -356,13 +356,13 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
 
           {uploading && uploadProgress < 100 && (
             <div className="space-y-1.5">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-stone-200">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                 <div
                   className="h-2 rounded-full bg-amber-600 transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-xs text-stone-500">Đang gửi file lên server... {uploadProgress}%</p>
+              <p className="text-xs text-slate-500">Đang gửi file lên server... {uploadProgress}%</p>
               <p className="text-xs text-amber-700">Đang xử lý dữ liệu OTA. Vui lòng không F5/reload cho đến khi tiến trình hoàn tất.</p>
             </div>
           )}
@@ -391,7 +391,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
           )}
 
           <button
-            className="rounded-full bg-amber-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 disabled:opacity-50"
             disabled={uploading || !!rollbackVersion || !!deletingVersion || !selectedFile || !version.trim()}
             type="submit"
           >
@@ -408,7 +408,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-900">Danh sách Firmware</h2>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-slate-500">
             {manifest.firmwares.length} phiên bản
             {manifest.active_version ? ` · Active: v${manifest.active_version}` : ""}
           </span>
@@ -474,7 +474,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                   key={fw.version}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6z" strokeLinecap="round" strokeLinejoin="round" />
                         <polyline points="9 3 9 9 15 9" strokeLinecap="round" strokeLinejoin="round" />
@@ -483,7 +483,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <a
-                          className="font-semibold text-stone-900 hover:underline"
+                          className="text-sm font-bold text-slate-900 hover:underline"
                           href={`https://github.com/giangbc2k4/room-firmware/tree/master/releases/v${fw.version}`}
                           rel="noopener noreferrer"
                           target="_blank"
@@ -491,15 +491,15 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                           v{fw.version}
                         </a>
                         {isActive && (
-                          <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                          <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
                             Active
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xs text-slate-500 mt-1">
                         {formatBytes(fw.size)} · {formatDate(fw.uploaded_at)}
                       </p>
-                      <p className="mt-0.5 text-xs text-stone-500">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         Người upload: {fw.uploaded_by || "Không rõ"}
                       </p>
                       {fw.rolled_back_by && (
@@ -509,14 +509,14 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                         </p>
                       )}
                       {fw.note && (
-                        <p className="mt-0.5 text-xs text-stone-500 italic">{fw.note}</p>
+                        <p className="mt-0.5 text-xs text-slate-500 italic">{fw.note}</p>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 sm:shrink-0">
                     <a
-                      className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-stone-900 hover:text-stone-900"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300"
                       download={`firmware-${fw.version}.bin`}
                       href={firmwareRawUrl(fw.version)}
                       rel="noopener noreferrer"
@@ -526,7 +526,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                     </a>
                     {!isActive && (
                       <button
-                        className="rounded-full border border-stone-400 px-3 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-700 hover:text-white hover:border-stone-700"
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-800 hover:text-white hover:border-slate-800"
                         disabled={!!rollbackVersion || !!deletingVersion || uploading}
                         onClick={() => handleActivate(fw.version)}
                         type="button"
@@ -535,7 +535,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                       </button>
                     )}
                     <button
-                      className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-600 hover:text-white"
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 hover:border-red-300"
                       disabled={isActive || !!rollbackVersion || !!deletingVersion || uploading}
                       onClick={() => handleDelete(fw.version)}
                       type="button"
@@ -553,11 +553,11 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       {/* OTA Endpoint Info */}
       <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
         <h2 className="mb-4 text-base font-semibold text-slate-900">Thông tin OTA cho thiết bị (ESP32)</h2>
-        <div className="space-y-3 text-xs text-stone-600">
+        <div className="space-y-3 text-xs text-slate-600">
           <div className="flex flex-col gap-1">
-            <span className="font-medium text-stone-500">Kiểm tra phiên bản (version.json):</span>
+            <span className="font-medium text-slate-500">Kiểm tra phiên bản (version.json):</span>
             <a
-              className="break-all rounded-lg bg-stone-200 px-2 py-1 font-mono text-stone-800 hover:underline"
+              className="break-all rounded-lg bg-slate-200 px-2 py-1 font-mono text-slate-800 hover:underline"
               href="https://raw.githubusercontent.com/giangbc2k4/room-firmware/refs/heads/master/version.json"
               rel="noopener noreferrer"
               target="_blank"
@@ -566,9 +566,9 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
             </a>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="font-medium text-stone-500">ESP32 download URL (releases/latest):</span>
+            <span className="font-medium text-slate-500">ESP32 download URL (releases/latest):</span>
             <a
-              className="break-all rounded-lg bg-stone-200 px-2 py-1 font-mono text-stone-800 hover:underline"
+              className="break-all rounded-lg bg-slate-200 px-2 py-1 font-mono text-slate-800 hover:underline"
               href={`${GH_RAW}/releases/latest/firmware.bin`}
               rel="noopener noreferrer"
               target="_blank"
@@ -578,12 +578,12 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
           </div>
           {manifest.active_version && (
             <div className="flex flex-col gap-1">
-              <span className="font-medium text-stone-500">Active version hiện tại:</span>
+              <span className="font-medium text-slate-500">Active version hiện tại:</span>
               <div className="flex items-center gap-2 flex-wrap">
                 <code className="rounded-lg bg-amber-100 px-2 py-1 font-mono text-amber-900">
                   v{manifest.active_version}
                 </code>
-                <span className="rounded-lg bg-stone-200 px-2 py-1 text-stone-700">
+                <span className="rounded-lg bg-slate-200 px-2 py-1 text-slate-700">
                   Upload bởi: {activeEntry?.uploaded_by || "Không rõ"}
                 </span>
                 {activeEntry?.rolled_back_by && (
@@ -592,7 +592,7 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
                   </span>
                 )}
                 <a
-                  className="break-all rounded-lg bg-stone-200 px-2 py-1 font-mono text-stone-700 hover:underline"
+                  className="break-all rounded-lg bg-slate-200 px-2 py-1 font-mono text-slate-700 hover:underline"
                   href={firmwareRawUrl(manifest.active_version)}
                   rel="noopener noreferrer"
                   target="_blank"
@@ -606,8 +606,9 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       </section>
 
       {isPending && (
-        <p className="text-xs text-stone-400">Đang làm mới dữ liệu...</p>
+        <p className="text-xs text-slate-400">Đang làm mới dữ liệu...</p>
       )}
     </div>
   );
 }
+

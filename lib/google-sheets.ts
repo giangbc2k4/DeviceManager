@@ -37,6 +37,7 @@ export type DeviceRow = {
   license: string;
   startDate: string;
   expireDate: string;
+  version: string;
   debug: boolean;
 };
 
@@ -94,6 +95,7 @@ export type Sheet1SessionRow = {
   status: string;
   lastSeen: string;
   wifiSignal: string;
+  fwVersion: string;
   startIso: string;
   endIso: string;
   minutes: number;
@@ -213,7 +215,7 @@ export async function listDevices(): Promise<DeviceRow[]> {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A2:H`,
+    range: `${sheetName}!A2:I`,
   });
 
   const rows = response.data.values || [];
@@ -227,6 +229,7 @@ export async function listDevices(): Promise<DeviceRow[]> {
       license: toText(row[3]),
       startDate: toText(row[4]),
       expireDate: toText(row[5]),
+      version: toText(row[8]),
       debug: toText(row[7]).toUpperCase() === "ON",
     }))
     .filter((row) => row.mac !== "");
@@ -562,7 +565,7 @@ export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${activitySheetName}!A2:H`,
+    range: `${activitySheetName}!A2:I`,
     valueRenderOption: "UNFORMATTED_VALUE",
     dateTimeRenderOption: "SERIAL_NUMBER",
   });
@@ -579,6 +582,7 @@ export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
     const status = toText(row[5]);
     const lastSeenRaw = row[6];
     const wifiSignal = toText(row[7]);
+    const fwVersionRaw = toText(row[8]);
 
     const start = parseSheetDate(startRaw, tzOffsetMinutes);
     const end = endRaw ? parseSheetDate(endRaw, tzOffsetMinutes) : null;
@@ -599,6 +603,7 @@ export async function getSheet1SessionsByDay(): Promise<Sheet1DayGroup[]> {
       status,
       lastSeen: lastSeen ? formatDateTimeLabel(lastSeen, tzOffsetMinutes) : "",
       wifiSignal,
+      fwVersion: fwVersionRaw,
       startIso: start.toISOString(),
       endIso: end ? end.toISOString() : "",
       minutes,

@@ -19,6 +19,22 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
   const [logModalMac, setLogModalMac] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
+  type ToastType = { message: string; type: "success" | "error" | "info" } | null;
+  const [toast, setToast] = useState<ToastType>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  function showToast(message: string, type: "success" | "error" | "info") {
+    setToast({ message, type });
+    setToastVisible(true);
+    if (type !== "info") {
+      setTimeout(() => setToastVisible(false), 5000);
+    }
+  }
+
+  function dismissToast() {
+    setToastVisible(false);
+  }
+
   // Sort: Phòng đang mở lên đầu, LOCKED xuống cuối
   const sortedDevices = [...devices].sort((a, b) => {
     const aOpen = openRooms.includes(a.room) ? 0 : 1;
@@ -67,6 +83,7 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
 
   async function handleToggle(mac: string) {
     setBusyMac(mac);
+    showToast(`Đang cập nhật thiết bị ${mac}... Không thoát hoặc F5 trang.`, "info");
     try {
       const response = await fetch("/api/devices/toggle", {
         method: "POST",
@@ -75,13 +92,15 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       });
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        alert(payload.message || "Không thể cập nhật thiết bị");
+        showToast(payload.message || "Không thể cập nhật thiết bị", "error");
         return;
       }
+      showToast(`Đã thiết lập trạng thái cho thiết bị ${mac}`, "success");
       router.refresh();
     } catch {
-      alert("Không thể kết nối tới máy chủ");
+      showToast("Không thể kết nối tới máy chủ", "error");
     } finally {
+      if (toast?.type === "info") dismissToast();
       setBusyMac("");
     }
   }
@@ -89,6 +108,7 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
   async function handleChangeLicense(mac: string, nextLicense: string) {
     const normalized = nextLicense.toUpperCase();
     setBusyMac(mac);
+    showToast(`Đang cập nhật License thiết bị ${mac}... Không thoát hoặc F5 trang.`, "info");
     try {
       const response = await fetch("/api/devices/license", {
         method: "POST",
@@ -97,13 +117,15 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       });
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        alert(payload.message || "Không thể cập nhật license");
+        showToast(payload.message || "Không thể cập nhật license", "error");
         return;
       }
+      showToast(`Cập nhật gói bản quyền cấp cho ${mac} thành công`, "success");
       router.refresh();
     } catch {
-      alert("Không thể kết nối tới máy chủ");
+      showToast("Không thể kết nối tới máy chủ", "error");
     } finally {
+      if (toast?.type === "info") dismissToast();
       setBusyMac("");
     }
   }
@@ -111,6 +133,7 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
   async function handleChangeExpireDate(mac: string, newExpireDate: string) {
     if (!newExpireDate) return;
     setBusyMac(mac);
+    showToast(`Đang cập nhật ngày hết hạn ${mac}... Không thoát hoặc F5 trang.`, "info");
     try {
       const response = await fetch("/api/devices/expire", {
         method: "POST",
@@ -119,13 +142,15 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       });
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        alert(payload.message || "Không thể cập nhật ngày hết hạn");
+        showToast(payload.message || "Không thể cập nhật ngày hết hạn", "error");
         return;
       }
+      showToast(`Đã gia hạn thành công thiết bị ${mac} tới ngày ${newExpireDate}`, "success");
       router.refresh();
     } catch {
-      alert("Không thể kết nối tới máy chủ");
+      showToast("Không thể kết nối tới máy chủ", "error");
     } finally {
+      if (toast?.type === "info") dismissToast();
       setBusyMac("");
       setEditingExpire("");
     }
@@ -135,6 +160,7 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
     const accepted = window.confirm(`Xóa thiết bị ${mac} khỏi hệ thống?`);
     if (!accepted) return;
     setBusyMac(mac);
+    showToast(`Đang xoá thiết bị ${mac}... Không thoát hoặc F5 trang.`, "info");
     try {
       const response = await fetch("/api/devices/delete", {
         method: "POST",
@@ -143,19 +169,22 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       });
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        alert(payload.message || "Không thể xóa thiết bị");
+        showToast(payload.message || "Không thể xóa thiết bị", "error");
         return;
       }
+      showToast(`Thiết bị ${mac} đã bị xoá vĩnh viễn`, "success");
       router.refresh();
     } catch {
-      alert("Không thể kết nối tới máy chủ");
+      showToast("Không thể kết nối tới máy chủ", "error");
     } finally {
+      if (toast?.type === "info") dismissToast();
       setBusyMac("");
     }
   }
 
   async function handleToggleDebug(mac: string, currentDebug: boolean) {
     setBusyMac(mac);
+    showToast(`Đang thiết lập Debug cho ${mac}... Không thoát hoặc F5 trang.`, "info");
     try {
       const response = await fetch("/api/devices/debug", {
         method: "POST",
@@ -164,19 +193,57 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       });
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        alert(payload.message || "Không thể cập nhật debug");
+        showToast(payload.message || "Không thể cập nhật debug", "error");
         return;
       }
+      showToast(`Cập nhật trạng thái tải Log thành công`, "success");
       router.refresh();
     } catch {
-      alert("Không thể kết nối tới máy chủ");
+      showToast("Không thể kết nối tới máy chủ", "error");
     } finally {
+      if (toast?.type === "info") dismissToast();
       setBusyMac("");
     }
   }
 
   return (
     <>
+      {/* Toast Banner */}
+      <div
+        className={`fixed inset-x-0 bottom-4 z-50 flex justify-center transition-transform duration-300 ${
+          toastVisible ? "translate-y-0" : "translate-y-[150%]"
+        }`}
+      >
+        {toast && (
+          <div
+            className={`pointer-events-auto flex items-center gap-3 rounded-2xl px-5 py-3.5 text-sm font-medium shadow-xl ${
+              toast.type === "success"
+                ? "bg-emerald-600 text-white"
+                : toast.type === "error"
+                ? "bg-red-600 text-white"
+                : "bg-blue-600 text-white"
+            }`}
+          >
+            {toast.type === "info" && (
+              <svg className="h-5 w-5 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" />
+              </svg>
+            )}
+            <span>{toast.message}</span>
+            {toast.type !== "info" && (
+              <button
+                className="ml-2 rounded-full border border-white/40 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/15"
+                onClick={dismissToast}
+                type="button"
+              >
+                Đóng
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-left border-separate border-spacing-0">
           <thead>
@@ -196,7 +263,10 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
               <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                 Hết hạn
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">
+                Phiên bản
+              </th>
+              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">
                 Debug
               </th>
               <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">
@@ -358,8 +428,15 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
                     </div>
                   </td>
 
+                  {/* Phiên bản */}
+                  <td className="px-4 lg:px-8 py-4 lg:py-5 text-center">
+                    <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-[11px] font-mono font-bold text-slate-600">
+                      {device.version ? `v${device.version}` : "N/A"}
+                    </span>
+                  </td>
+
                   {/* Debug Toggle */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5">
+                  <td className="px-4 lg:px-8 py-4 lg:py-5 text-center">
                     <button
                       type="button"
                       title={isDebugOn ? "Tắt debug" : "Bật debug"}
@@ -525,10 +602,10 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
-        className="flex h-[80vh] w-full max-w-4xl flex-col overflow-hidden shadow-2xl ring-1 ring-slate-700"
+        className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden shadow-2xl ring-1 ring-slate-700"
         style={{ borderRadius: "12px", backgroundColor: "#0C0C0C" }}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-rose-500" />
@@ -550,38 +627,74 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 font-mono text-[12px] leading-relaxed">
-          {logs.length === 0 ? (
-            <div className="flex items-center gap-3 text-emerald-600/60 animate-pulse">
-              <span className="inline-block w-2.5 h-4 bg-emerald-600/60" />
-              Đang thiết lập kết nối mã hoá bảo mật tới Server...
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {logs.map((log) => {
-                let colorClass = "text-slate-300";
-                if (log.level === "ERROR" || log.level === "CRIT") colorClass = "text-rose-400";
-                else if (log.level === "WARN") colorClass = "text-amber-400";
-                else if (log.level === "INFO") colorClass = "text-emerald-400";
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 font-mono text-[12px] leading-relaxed">
+            {logs.length === 0 ? (
+              <div className="flex items-center gap-3 text-emerald-600/60 animate-pulse">
+                <span className="inline-block w-2.5 h-4 bg-emerald-600/60" />
+                Đang thiết lập kết nối mã hoá bảo mật tới Server...
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {logs.map((log) => {
+                  let colorClass = "text-slate-300";
+                  if (log.level === "ERROR" || log.level === "CRIT") colorClass = "text-rose-400";
+                  else if (log.level === "WARN") colorClass = "text-amber-400";
+                  else if (log.level === "INFO") colorClass = "text-emerald-400";
 
-                return (
-                  <div
-                    key={log.id}
-                    className="flex gap-3 hover:bg-white/5 px-1 py-0.5 rounded transition-colors group"
-                  >
-                    <span className="text-slate-600 shrink-0 select-none">[{log.timestamp}]</span>
-                    <span className={`shrink-0 w-12 font-bold select-none ${colorClass}`}>
-                      {log.level}
-                    </span>
-                    <span className="text-slate-300 break-words group-hover:text-white transition-colors">
-                      {log.msg}
-                    </span>
-                  </div>
-                );
-              })}
-              <div ref={logsEndRef} className="h-4" />
+                  return (
+                    <div
+                      key={log.id}
+                      className="flex gap-3 lg:gap-4 items-start hover:bg-white/5 px-2 py-1 rounded transition-colors group text-[13px]"
+                    >
+                      <span className="text-slate-600 shrink-0 select-none w-[160px] whitespace-nowrap">
+                        [{log.timestamp}]
+                      </span>
+                      <span className={`shrink-0 w-12 font-bold select-none ${colorClass}`}>
+                        {log.level}
+                      </span>
+                      <span className="text-slate-300 break-words group-hover:text-white transition-colors flex-1">
+                        {log.msg}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div ref={logsEndRef} className="h-4" />
+              </div>
+            )}
+          </div>
+
+          <div className="w-full lg:w-[320px] bg-slate-900/40 border-t lg:border-t-0 lg:border-l border-slate-800 p-5 overflow-y-auto shrink-0 flex flex-col gap-4">
+            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <span className="material-symbols-outlined text-[14px]">menu_book</span>
+              Từ Điển Chẩn Đoán
+            </h4>
+            <ul className="space-y-2.5 text-[12px] text-slate-300">
+              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
+                <span className="text-rose-400 font-mono font-bold block mb-1">HW_REASON: Brownout</span>
+                Nguồn điện nuôi mạch yếu (có thể do đoản mạch hoặc sạc nhái). Mạch phải sập và lên lại.
+              </li>
+              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
+                <span className="text-rose-400 font-mono font-bold block mb-1">HW_REASON: Panic / WDT</span>
+                Tính năng chống treo kích hoạt do chương trình quá tải hoặc kẹt. Đã tự phục hồi khẩn cấp.
+              </li>
+              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
+                <span className="text-rose-400 font-mono font-bold block mb-1">CRIT: API_ERR_RESTART</span>
+                Rớt mạng WiFi nhiều lần hoặc Google Server phản hồi quá chậm. Mạch cắt luồng tự khởi động lại.
+              </li>
+              <li className="bg-amber-500/10 p-2.5 rounded border border-amber-500/20">
+                <span className="text-amber-400 font-mono font-bold block mb-1">WARN: Low Heap</span>
+                Bộ nhớ RAM đang cạn kiệt. Nếu tiếp tục cạn, mạch sẽ kích hoạt WDT phục hồi tự động.
+              </li>
+              <li className="bg-emerald-500/10 p-2.5 rounded border border-emerald-500/20">
+                <span className="text-emerald-400 font-mono font-bold block mb-1">INFO: Heartbeat OK</span>
+                Tình trạng hoàn hảo. Kết nối máy chủ tốt, RAM cân bằng, thiết bị cực kỳ xịn mịn.
+              </li>
+            </ul>
+            <div className="mt-auto pt-4 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed">
+              * Mạch được trang bị áo giáp 3 lớp: Watchdog 15s (Chống treo vĩnh viễn), Loop Counter (Chống kiệt RAM), Supervisor Task (Chống sập tầng mạng).
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

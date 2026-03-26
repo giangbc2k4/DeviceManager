@@ -1,4 +1,4 @@
-import { getSheet1SessionsByDay } from "@/lib/google-sheets";
+import { getSheet1SessionsByDay, listDevices } from "@/lib/google-sheets";
 import type { Sheet1SessionRow } from "@/lib/google-sheets";
 import { AutoRefresh } from "./auto-refresh";
 
@@ -39,7 +39,11 @@ function groupRowsByChatId(rows: Sheet1SessionRow[]) {
   const grouped: Record<string, Sheet1SessionRow[]> = {};
 
   rows.forEach((row) => {
-    const chatKey = row.chatId || "(trống)";
+    let chatKey = row.chatId || "(trống)";
+    if (chatKey === "-5021046267" || chatKey === "-1003686987675") {
+      chatKey = "-1003686987675 (bao gồm -5021046267)";
+    }
+    
     if (!grouped[chatKey]) {
       grouped[chatKey] = [];
     }
@@ -57,10 +61,14 @@ function groupRowsByChatId(rows: Sheet1SessionRow[]) {
 
 export default async function AdminSheet1Page() {
   let dayGroups = [] as Awaited<ReturnType<typeof getSheet1SessionsByDay>>;
+  let devices = [] as Awaited<ReturnType<typeof listDevices>>;
   let sheetError = "";
 
   try {
-    dayGroups = await getSheet1SessionsByDay();
+    [dayGroups, devices] = await Promise.all([
+      getSheet1SessionsByDay(),
+      listDevices(),
+    ]);
   } catch (error) {
     sheetError = error instanceof Error ? error.message : "Failed to load activity data";
   }
@@ -96,6 +104,7 @@ export default async function AdminSheet1Page() {
         <div className="space-y-6">
           {dayGroups.map((group) => {
             const rooms = groupRowsByRoom(group.rows);
+            const roomVersionMap = new Map(devices.map((d) => [d.room, d.version || "N/A"]));
 
             return (
               <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden" key={group.dateKey}>
@@ -143,9 +152,16 @@ export default async function AdminSheet1Page() {
                                 roomGroup.isActive ? "bg-emerald-50/80" : "bg-slate-50/50"
                               }`}
                             >
-                              <p className="text-sm font-semibold text-slate-800">
-                                Phòng {roomGroup.room}
-                              </p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-slate-800">
+                                    Phòng {roomGroup.room}
+                                  </p>
+                                  {roomVersionMap.get(roomGroup.room) && roomVersionMap.get(roomGroup.room) !== "N/A" && (
+                                    <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                                      v{roomVersionMap.get(roomGroup.room)}
+                                    </span>
+                                  )}
+                                </div>
                               <div className="flex items-center gap-2 text-xs text-slate-600">
                                 {roomGroup.isActive ? (
                                   <span className="rounded-full bg-emerald-600 px-2 py-0.5 font-semibold text-white text-[10px]">
@@ -169,6 +185,7 @@ export default async function AdminSheet1Page() {
                                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Trạng thái</th>
                                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Last seen</th>
                                     <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">WiFi</th>
+                                    <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Phiên bản</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -189,6 +206,13 @@ export default async function AdminSheet1Page() {
                                       </td>
                                       <td className="px-5 py-3.5 text-xs text-slate-600">{row.lastSeen || "-"}</td>
                                       <td className="px-5 py-3.5 text-xs font-mono text-slate-500">{row.wifiSignal || "-"}</td>
+                                      <td className="px-5 py-3.5 text-xs font-mono text-slate-500 text-center">
+                                        {row.fwVersion ? (
+                                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-600">
+                                            v{row.fwVersion}
+                                          </span>
+                                        ) : "-"}
+                                      </td>
                                     </tr>
                                   ))}
                                 </tbody>

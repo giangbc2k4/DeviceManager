@@ -33,49 +33,54 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
   });
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f7e8c8,_#efe8dc_35%,_#d8d0c1_100%)] px-2 py-4 md:px-6 md:py-10 text-stone-900">
-      <div className="mx-auto max-w-5xl rounded-[32px] border border-stone-900/10 bg-white/80 p-4 md:p-8 shadow-[0_20px_80px_rgba(60,40,10,0.12)] backdrop-blur">
-        <div className="flex flex-col gap-3 border-b border-stone-200 pb-6">
-          <p className="text-xs uppercase tracking-[0.35em] text-amber-700">Device Manager</p>
-          <h1 className="text-3xl font-semibold">Báo cáo hoạt động</h1>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-stone-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Tổng thời lượng</p>
-            <p className="mt-2 text-2xl font-extrabold text-orange-600">{formatHours(debug.totalMinutes)}</p>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-[0.25em] text-stone-500">Khung thời gian</p>
-            <p className="mt-2 text-sm font-semibold text-stone-900">{debug.windowStart} → {debug.windowEnd}</p>
+    <main className="min-h-screen px-4 py-8 md:px-8 md:py-12 bg-slate-50/50">
+      <div className="mx-auto max-w-5xl">
+        {/* Header */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-blue-600 font-bold mb-2">Device Manager</p>
+            <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-900">Báo cáo hoạt động</h1>
           </div>
         </div>
 
-        <section className="mt-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-stone-900">Biểu đồ timeline trong ngày</h2>
-          <p className="mt-1 text-sm text-stone-600">Mỗi hàng là một phòng, mỗi đoạn màu là một phiên hoạt động.</p>
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mb-8 lg:mb-10">
+          <div className="bg-white p-5 lg:p-6 rounded-xl shadow-sm border border-slate-100 transition-transform hover:-translate-y-1 duration-200">
+            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Tổng thời lượng</p>
+            <p className="text-2xl lg:text-3xl font-extrabold tracking-tighter text-blue-600 mt-1">{formatHours(debug.totalMinutes)}</p>
+          </div>
+          <div className="bg-white p-5 lg:p-6 rounded-xl shadow-sm border border-slate-100 transition-transform hover:-translate-y-1 duration-200">
+            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Khung thời gian</p>
+            <p className="text-sm lg:text-base font-semibold text-slate-900 mt-2">{debug.windowStart} → {debug.windowEnd}</p>
+          </div>
+        </div>
+
+        {/* Timeline section */}
+        <section className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden p-5 lg:p-8">
+          <h2 className="text-lg font-bold text-slate-900">Biểu đồ timeline trong ngày</h2>
+          <p className="mt-1 text-sm text-slate-500">Mỗi hàng là một phòng, mỗi đoạn màu là một phiên hoạt động.</p>
 
           {hasChatId ? (
-            <p className="mt-2 text-sm text-stone-700">Ngày báo cáo: <span className="font-semibold">{debug.dateLabel}</span></p>
+            <p className="mt-2 text-sm text-slate-700">Ngày báo cáo: <span className="font-semibold">{debug.dateLabel}</span></p>
           ) : null}
 
           {!hasChatId ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               Nhập `chatId` để xem báo cáo hoạt động của đoạn chat tương ứng.
             </div>
           ) : null}
 
           {hasChatId && debug.rooms.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               Không có dữ liệu cho chat id này trong khung ngày hôm qua.
             </div>
           ) : null}
 
           {hasRoomData ? (
-            <TimelineScroll className="mt-5 overflow-x-auto rounded-xl border border-stone-200 p-4">
+            <TimelineScroll className="mt-6 overflow-x-auto rounded-xl border border-slate-100 shadow-sm p-4">
               <div className="min-w-[820px]">
                 <div
-                  className="ml-[130px] mb-2 grid text-[11px] font-semibold text-stone-500"
+                  className="ml-[130px] mb-2 grid text-[11px] font-semibold text-slate-500"
                   style={{ gridTemplateColumns: `repeat(${timelineTicks.length}, minmax(0, 1fr))` }}
                 >
                   {timelineTicks.map((tick) => (
@@ -89,17 +94,17 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
                   {debug.rooms.map((room) => (
                     <div className="grid grid-cols-[120px_1fr] items-center gap-3" key={`timeline-${room.room}`}>
                       <div>
-                        <p className="truncate text-sm font-semibold text-stone-900">{room.room}</p>
-                        <p className="text-xs text-stone-500">{room.count} lượt • {room.totalMinutes} phút</p>
+                        <p className="truncate text-sm font-semibold text-slate-900">{room.room}</p>
+                        <p className="text-xs text-slate-500">{room.count} lượt • {room.totalMinutes} phút</p>
                       </div>
 
-                      <div className="relative h-10 overflow-hidden rounded-lg bg-stone-100">
+                      <div className="relative h-10 overflow-hidden rounded-lg bg-slate-100">
                         {timelineTicks.slice(1, -1).map((tick) => {
                           const left = ((tick.hourOffset * 60 * 60 * 1000) / windowDurationMs) * 100;
                           const strong = tick.hourOffset % 6 === 0;
                           return (
                             <div
-                              className={`absolute top-0 h-full w-px ${strong ? "bg-stone-400" : "bg-stone-300/70"}`}
+                              className={`absolute top-0 h-full w-px ${strong ? "bg-slate-400" : "bg-slate-300/70"}`}
                               key={`grid-${room.room}-${tick.hourOffset}`}
                               style={{ left: `${left}%` }}
                             />
@@ -130,21 +135,21 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
           ) : null}
 
           {hasRoomData ? (
-            <div className="mt-6 overflow-x-auto rounded-xl border border-stone-200">
-              <table className="min-w-full divide-y divide-stone-200 text-sm">
-                <thead className="bg-stone-50 text-left text-xs uppercase tracking-[0.12em] text-stone-500">
-                  <tr>
-                    <th className="px-4 py-3">Phòng</th>
-                    <th className="px-4 py-3">Số lượt (merge)</th>
-                    <th className="px-4 py-3">Tổng phút</th>
+            <div className="mt-8 overflow-x-auto rounded-xl border border-slate-100 shadow-sm">
+              <table className="min-w-full divide-y divide-slate-100 text-left">
+                <thead>
+                  <tr className="bg-slate-50/80">
+                    <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Phòng</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Số lượt (merge)</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Tổng phút</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody className="divide-y divide-slate-50">
                   {debug.rooms.map((item) => (
-                    <tr key={item.room}>
-                      <td className="px-4 py-3 font-medium text-stone-900">Phòng {item.room}</td>
-                      <td className="px-4 py-3">{item.count}</td>
-                      <td className="px-4 py-3">{item.totalMinutes} phút</td>
+                    <tr key={item.room} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">Phòng {item.room}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{item.count}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 font-semibold">{item.totalMinutes} phút</td>
                     </tr>
                   ))}
                 </tbody>
@@ -154,26 +159,26 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
 
           {hasRoomData ? (
             <>
-              <h3 className="mt-8 text-base font-semibold text-stone-900">Chi tiết phiên</h3>
+              <h3 className="mt-8 text-base font-semibold text-slate-900">Chi tiết phiên</h3>
               <div className="mt-3 space-y-4">
                 {debug.rooms.map((room) => (
-                  <div className="rounded-xl border border-stone-200 p-4" key={`merged-${room.room}`}>
-                    <p className="text-sm font-semibold text-stone-900">Phòng {room.room}</p>
-                    <div className="mt-2 overflow-x-auto">
-                      <table className="min-w-full divide-y divide-stone-200 text-sm">
-                        <thead className="bg-stone-50 text-left text-xs uppercase tracking-[0.12em] text-stone-500">
-                          <tr>
-                            <th className="px-3 py-2">Bắt đầu</th>
-                            <th className="px-3 py-2">Kết thúc</th>
-                            <th className="px-3 py-2">Phút</th>
+                  <div className="rounded-xl border border-slate-100 p-4" key={`merged-${room.room}`}>
+                    <p className="text-sm font-semibold text-slate-900">Phòng {room.room}</p>
+                    <div className="mt-3 overflow-x-auto rounded-lg border border-slate-100">
+                      <table className="min-w-full divide-y divide-slate-100 text-left">
+                        <thead>
+                          <tr className="bg-slate-50/80">
+                            <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Bắt đầu</th>
+                            <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Kết thúc</th>
+                            <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Phút</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-stone-100">
+                        <tbody className="divide-y divide-slate-50 bg-white">
                           {room.mergedSessions.map((session, idx) => (
-                            <tr key={`${room.room}-${idx}`}>
-                              <td className="px-3 py-2">{session.start}</td>
-                              <td className="px-3 py-2">{session.end}</td>
-                              <td className="px-3 py-2">{session.minutes}</td>
+                            <tr key={`${room.room}-${idx}`} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="px-4 py-3 text-xs text-slate-600 font-medium">{session.start}</td>
+                              <td className="px-4 py-3 text-xs text-slate-600">{session.end}</td>
+                              <td className="px-4 py-3 text-xs text-slate-900 font-semibold">{session.minutes}</td>
                             </tr>
                           ))}
                         </tbody>
