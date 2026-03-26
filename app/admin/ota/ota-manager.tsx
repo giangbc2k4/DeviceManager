@@ -287,8 +287,8 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       </div>
 
       {/* Upload Form */}
-      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
-        <h2 className="mb-1 text-base font-semibold text-stone-800">Upload &amp; Release Firmware</h2>
+      <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
+        <h2 className="mb-1 text-lg font-bold text-slate-900">Upload &amp; Release Firmware</h2>
         <p className="mb-4 text-xs text-stone-500">
           Upload sẽ đồng thời ghi vào <code>releases/latest/</code>, <code>releases/v&#x7B;version&#x7D;/</code> và cập nhật <code>version.json</code> trên GitHub.
         </p>
@@ -405,9 +405,9 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       </section>
 
       {/* Firmware List */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-stone-800">Danh sách Firmware</h2>
+      <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">Danh sách Firmware</h2>
           <span className="text-xs text-stone-500">
             {manifest.firmwares.length} phiên bản
             {manifest.active_version ? ` · Active: v${manifest.active_version}` : ""}
@@ -461,11 +461,11 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
         )}
 
         {manifest.firmwares.length === 0 ? (
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
             Chưa có firmware nào được upload.
           </div>
         ) : (
-          <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white overflow-hidden">
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
             {manifest.firmwares.map((fw) => {
               const isActive = fw.version === manifest.active_version;
               return (
@@ -551,8 +551,8 @@ export function OtaManager({ manifest: initialManifest }: { manifest: OtaManifes
       </section>
 
       {/* OTA Endpoint Info */}
-      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-5">
-        <h2 className="mb-3 text-sm font-semibold text-stone-700">Thông tin OTA cho thiết bị (ESP32)</h2>
+      <section className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 lg:p-8">
+        <h2 className="mb-4 text-base font-semibold text-slate-900">Thông tin OTA cho thiết bị (ESP32)</h2>
         <div className="space-y-3 text-xs text-stone-600">
           <div className="flex flex-col gap-1">
             <span className="font-medium text-stone-500">Kiểm tra phiên bản (version.json):</span>

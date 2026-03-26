@@ -1,3 +1,28 @@
+// Lấy log thiết bị từ sheet DEVICE_LOGS
+export async function listDeviceLogs(mac?: string, limit: number = 100) {
+  const { spreadsheetId } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+  const logSheetName = "DEVICE_LOGS";
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${logSheetName}!A2:E`,
+  });
+  let rows = response.data.values || [];
+  // Lọc theo MAC nếu có
+  if (mac) {
+    const macNorm = mac.trim().toUpperCase();
+    rows = rows.filter(row => (row[1] || "").toUpperCase() === macNorm);
+  }
+  // Lấy dòng mới nhất trước
+  rows = rows.slice(-limit).reverse();
+  return rows.map(row => ({
+    timestamp: row[0],
+    mac: row[1],
+    room: row[2],
+    level: row[3],
+    message: row[4],
+  }));
+}
 import { google } from "googleapis";
 
 const CHAT_ID_MAP: Record<string, string> = {
@@ -12,7 +37,9 @@ export type DeviceRow = {
   license: string;
   startDate: string;
   expireDate: string;
+  debug: boolean;
 };
+
 
 export type DailyRoomSummary = {
   room: string;
@@ -186,7 +213,7 @@ export async function listDevices(): Promise<DeviceRow[]> {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A2:F`,
+    range: `${sheetName}!A2:H`,
   });
 
   const rows = response.data.values || [];
@@ -200,8 +227,52 @@ export async function listDevices(): Promise<DeviceRow[]> {
       license: toText(row[3]),
       startDate: toText(row[4]),
       expireDate: toText(row[5]),
+      debug: toText(row[7]).toUpperCase() === "ON",
     }))
     .filter((row) => row.mac !== "");
+}
+
+// Lấy danh sách phòng đang mở (status ON trong Sheet1)
+export async function getOpenRooms(): Promise<Set<string>> {
+  const { spreadsheetId, activitySheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${activitySheetName}!A2:F`,
+  });
+
+  const rows = response.data.values || [];
+  const openRooms = new Set<string>();
+
+  for (const row of rows) {
+    const room = toText(row[0]);
+    const status = toText(row[5]);
+    if (room && status.toUpperCase() === "ON") {
+      openRooms.add(room);
+    }
+  }
+
+  return openRooms;
+}
+
+// Cập nhật trạng thái debug cho thiết bị (cột H - DEBUG)
+export async function updateDeviceDebug(mac: string, debug: boolean) {
+  const target = await findDeviceByMac(mac);
+  const { spreadsheetId, sheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  // Cột DEBUG là cột H (thứ 8)
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!H${target.rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[debug ? "ON" : "OFF"]],
+    },
+  });
+
+  return { mac: target.mac, debug };
 }
 
 export async function toggleDeviceLock(mac: string) {
