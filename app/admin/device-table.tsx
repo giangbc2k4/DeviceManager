@@ -535,15 +535,234 @@ type LogEntry = {
   msg: string;
 };
 
+type AnalysisIssue = {
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description: string;
+  count: number;
+};
+
+type AnalysisResult = {
+  healthScore: number;
+  healthLabel: string;
+  errorCount: number;
+  warnCount: number;
+  infoCount: number;
+  issues: AnalysisIssue[];
+  deviceInfo: {
+    fwVersion: string;
+    lastHeap: string;
+    uptime: string;
+    restartCount: number | null;
+  };
+};
+
+function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
+  let errorCount = 0;
+  let warnCount = 0;
+  let infoCount = 0;
+
+  // Pattern counters
+  let brownoutCount = 0;
+  let panicWdtCount = 0;
+  let apiErrCount = 0;
+  let lowHeapCount = 0;
+  let wifiLostCount = 0;
+  let otaFailCount = 0;
+  let supervisorRestartCount = 0;
+  let deviceExpiredCount = 0;
+  let httpErrCount = 0;
+
+  // Device info extraction
+  let fwVersion = "";
+  let lastHeap = "";
+  let uptime = "";
+  let restartCount: number | null = null;
+
+  for (const log of logs) {
+    const lvl = (log.level || "").toUpperCase();
+    const msg = log.msg || "";
+
+    if (lvl === "ERROR" || lvl === "CRIT") errorCount++;
+    else if (lvl === "WARN") warnCount++;
+    else infoCount++;
+
+    // --- Pattern matching ---
+    if (/brownout/i.test(msg)) brownoutCount++;
+    if (/panic|task.?watchdog|int.?watchdog/i.test(msg)) panicWdtCount++;
+    if (/API_ERR_RESTART/i.test(msg)) apiErrCount++;
+    if (/low.?heap/i.test(msg)) lowHeapCount++;
+    if (/wifi.*(lost|disconnect|connection lost)/i.test(msg)) wifiLostCount++;
+    if (/ota.*fail/i.test(msg)) otaFailCount++;
+    if (/supervisor|no.*ok.*heartbeat|no.*hb/i.test(msg) && lvl === "CRIT") supervisorRestartCount++;
+    if (/device.?expired/i.test(msg)) deviceExpiredCount++;
+    if (/hb.*http.*err|http.*error/i.test(msg)) httpErrCount++;
+
+    // --- Extract device info ---
+    const fwMatch = msg.match(/FW:\s*([0-9][0-9.]+)/);
+    if (fwMatch) fwVersion = fwMatch[1];
+
+    const heapMatch = msg.match(/Heap:\s*(\d+)\s*B/);
+    if (heapMatch) lastHeap = heapMatch[1];
+
+    const uptimeMatch = msg.match(/Uptime:\s*(\d+)\s*s/);
+    if (uptimeMatch) {
+      const sec = parseInt(uptimeMatch[1]);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      uptime = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    const restartMatch = msg.match(/Count=(\d+)/);
+    if (restartMatch) restartCount = parseInt(restartMatch[1]);
+  }
+
+  // --- Build issues list ---
+  const issues: AnalysisIssue[] = [];
+
+  if (brownoutCount > 0) {
+    issues.push({
+      severity: "critical",
+      title: "Sụt áp nguồn (Brownout)",
+      description: "Nguồn điện nuôi mạch yếu hoặc không ổn định. Kiểm tra cáp USB, adapter sạc, hoặc thay nguồn 5V/2A chất lượng.",
+      count: brownoutCount,
+    });
+  }
+
+  if (panicWdtCount > 0) {
+    issues.push({
+      severity: "critical",
+      title: "CPU Panic / Watchdog Timeout",
+      description: "Chương trình bị treo hoặc quá tải CPU. Watchdog đã tự restart để phục hồi. Nếu lặp lại nhiều, cần kiểm tra firmware.",
+      count: panicWdtCount,
+    });
+  }
+
+  if (apiErrCount > 0) {
+    issues.push({
+      severity: "critical",
+      title: "Lỗi API liên tục → Tự restart",
+      description: "Google Script không phản hồi liên tiếp " + apiErrCount + " lần. Có thể do mạng yếu hoặc server quá tải.",
+      count: apiErrCount,
+    });
+  }
+
+  if (supervisorRestartCount > 0) {
+    issues.push({
+      severity: "critical",
+      title: "Supervisor buộc restart",
+      description: "Không có heartbeat thành công quá 90 giây. Supervisor đã can thiệp restart để khôi phục kết nối.",
+      count: supervisorRestartCount,
+    });
+  }
+
+  if (otaFailCount > 0) {
+    issues.push({
+      severity: "critical",
+      title: "Cập nhật firmware OTA thất bại",
+      description: "Quá trình tải firmware mới bị lỗi. Kiểm tra kết nối internet và dung lượng firmware trên GitHub.",
+      count: otaFailCount,
+    });
+  }
+
+  if (deviceExpiredCount > 0) {
+    issues.push({
+      severity: "warning",
+      title: "Thiết bị hết hạn dùng thử",
+      description: "License TRIAL đã hết hạn. Thiết bị sẽ bị từ chối heartbeat. Cần gia hạn hoặc nâng cấp LIFETIME.",
+      count: deviceExpiredCount,
+    });
+  }
+
+  if (lowHeapCount > 0) {
+    issues.push({
+      severity: "warning",
+      title: "RAM đang cạn kiệt",
+      description: "Bộ nhớ heap dưới 40KB. Nếu tiếp tục giảm sẽ gây crash. Cân nhắc restart định kỳ hoặc giảm queue size.",
+      count: lowHeapCount,
+    });
+  }
+
+  if (wifiLostCount > 0) {
+    issues.push({
+      severity: "warning",
+      title: "Mất kết nối WiFi",
+      description: "WiFi bị ngắt " + wifiLostCount + " lần. Kiểm tra khoảng cách router, nhiễu sóng, hoặc giảm số thiết bị trên cùng mạng.",
+      count: wifiLostCount,
+    });
+  }
+
+  if (httpErrCount > 0) {
+    issues.push({
+      severity: "warning",
+      title: "Lỗi HTTP khi gọi server",
+      description: "Server trả về mã lỗi HTTP. Google Apps Script có thể bị rate-limit hoặc timeout.",
+      count: httpErrCount,
+    });
+  }
+
+  if (restartCount !== null && restartCount > 5) {
+    issues.push({
+      severity: "info",
+      title: "Thiết bị restart nhiều lần",
+      description: `Đã restart ${restartCount} lần kể từ lần cấp điện đầu tiên. Nên theo dõi thêm để xác định nguyên nhân.`,
+      count: 1,
+    });
+  }
+
+  // --- Health score ---
+  let score = 100;
+  score -= brownoutCount * 15;
+  score -= panicWdtCount * 12;
+  score -= apiErrCount * 10;
+  score -= supervisorRestartCount * 10;
+  score -= otaFailCount * 8;
+  score -= lowHeapCount * 5;
+  score -= wifiLostCount * 3;
+  score -= httpErrCount * 3;
+  score -= deviceExpiredCount * 5;
+  score = Math.max(0, Math.min(100, score));
+
+  let healthLabel = "";
+  if (logs.length === 0) {
+    healthLabel = "Chưa có dữ liệu";
+    score = 0;
+  } else if (score >= 90) {
+    healthLabel = "Tuyệt vời — Thiết bị hoạt động cực kỳ ổn định";
+  } else if (score >= 70) {
+    healthLabel = "Tốt — Có một số cảnh báo nhỏ, không đáng lo";
+  } else if (score >= 50) {
+    healthLabel = "Trung bình — Cần chú ý theo dõi các lỗi";
+  } else if (score >= 30) {
+    healthLabel = "Yếu — Nhiều lỗi nghiêm trọng, cần can thiệp";
+  } else {
+    healthLabel = "Nguy hiểm — Thiết bị không ổn định, cần xử lý ngay";
+  }
+
+  return {
+    healthScore: score,
+    healthLabel,
+    errorCount,
+    warnCount,
+    infoCount,
+    issues: issues.sort((a, b) => {
+      const order = { critical: 0, warning: 1, info: 2 };
+      return order[a.severity] - order[b.severity];
+    }),
+    deviceInfo: { fwVersion, lastHeap, uptime, restartCount },
+  };
+}
+
 function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [activeTab, setActiveTab] = useState<"logs" | "analysis">("logs");
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (logsEndRef.current) {
+    if (logsEndRef.current && activeTab === "logs") {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [logs]);
+  }, [logs, activeTab]);
 
   useEffect(() => {
     if (!mac) return;
@@ -599,40 +818,139 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
     };
   }, [mac]);
 
+  const analysis = analyzeDeviceLogs(logs);
+
+  const AnalysisContent = (
+    <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4">
+      <div className="rounded-lg bg-slate-800/60 p-3 lg:p-4 border border-slate-700/50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] lg:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tình trạng</span>
+          <span className={`text-sm font-black ${analysis.healthScore >= 80 ? "text-emerald-400" : analysis.healthScore >= 50 ? "text-amber-400" : "text-rose-400"}`}>
+            {analysis.healthScore}%
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-700 ${analysis.healthScore >= 80 ? "bg-emerald-500" : analysis.healthScore >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${analysis.healthScore}%` }} />
+        </div>
+        <p className={`mt-2 text-[10px] lg:text-[11px] font-semibold ${analysis.healthScore >= 80 ? "text-emerald-400" : analysis.healthScore >= 50 ? "text-amber-400" : "text-rose-400"}`}>
+          {analysis.healthLabel}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5 lg:gap-2">
+        <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-2 lg:p-2.5 text-center">
+          <p className="text-base lg:text-lg font-black text-rose-400">{analysis.errorCount}</p>
+          <p className="text-[8px] lg:text-[9px] font-bold text-rose-400/70 uppercase tracking-wider">Lỗi</p>
+        </div>
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2 lg:p-2.5 text-center">
+          <p className="text-base lg:text-lg font-black text-amber-400">{analysis.warnCount}</p>
+          <p className="text-[8px] lg:text-[9px] font-bold text-amber-400/70 uppercase tracking-wider">Cảnh báo</p>
+        </div>
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 lg:p-2.5 text-center">
+          <p className="text-base lg:text-lg font-black text-emerald-400">{analysis.infoCount}</p>
+          <p className="text-[8px] lg:text-[9px] font-bold text-emerald-400/70 uppercase tracking-wider">Bình thường</p>
+        </div>
+      </div>
+
+      {analysis.issues.length > 0 ? (
+        <div className="space-y-2">
+          <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Vấn đề phát hiện ({analysis.issues.length})</h5>
+          {analysis.issues.map((issue: AnalysisIssue, idx: number) => (
+            <div key={idx} className={`rounded-lg p-2.5 lg:p-3 border ${issue.severity === "critical" ? "bg-rose-500/10 border-rose-500/20" : issue.severity === "warning" ? "bg-amber-500/10 border-amber-500/20" : "bg-blue-500/10 border-blue-500/20"}`}>
+              <div className="flex items-start gap-2 mb-1">
+                <span className={`text-[9px] lg:text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${issue.severity === "critical" ? "bg-rose-500/30 text-rose-300" : issue.severity === "warning" ? "bg-amber-500/30 text-amber-300" : "bg-blue-500/30 text-blue-300"}`}>
+                  {issue.severity === "critical" ? "Nguy hiểm" : issue.severity === "warning" ? "Cảnh báo" : "Lưu ý"}
+                </span>
+                {issue.count > 1 && <span className="text-[10px] font-mono text-slate-500">×{issue.count}</span>}
+              </div>
+              <p className={`text-[11px] lg:text-[12px] font-bold mb-0.5 ${issue.severity === "critical" ? "text-rose-300" : issue.severity === "warning" ? "text-amber-300" : "text-blue-300"}`}>{issue.title}</p>
+              <p className="text-[10px] lg:text-[11px] text-slate-400 leading-relaxed">{issue.description}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 lg:p-4 text-center">
+          <span className="text-emerald-400 text-xl lg:text-2xl block mb-1">✓</span>
+          <p className="text-[11px] lg:text-[12px] font-bold text-emerald-400">Không phát hiện lỗi</p>
+          <p className="text-[10px] lg:text-[11px] text-slate-500 mt-1">Thiết bị đang hoạt động ổn định</p>
+        </div>
+      )}
+
+      {analysis.deviceInfo.fwVersion && (
+        <div className="rounded-lg bg-slate-800/60 p-2.5 lg:p-3 border border-slate-700/50 space-y-1.5">
+          <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Thông tin từ Log</h5>
+          {analysis.deviceInfo.fwVersion && (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">Firmware</span><span className="text-slate-300 font-mono font-bold">{analysis.deviceInfo.fwVersion}</span></div>
+          )}
+          {analysis.deviceInfo.lastHeap && (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">RAM còn</span><span className={`font-mono font-bold ${parseInt(analysis.deviceInfo.lastHeap) < 40000 ? "text-amber-400" : "text-slate-300"}`}>{analysis.deviceInfo.lastHeap} B</span></div>
+          )}
+          {analysis.deviceInfo.uptime && (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">Uptime</span><span className="text-slate-300 font-mono font-bold">{analysis.deviceInfo.uptime}</span></div>
+          )}
+          {analysis.deviceInfo.restartCount !== null && (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">Restart</span><span className={`font-mono font-bold ${analysis.deviceInfo.restartCount > 3 ? "text-rose-400" : "text-slate-300"}`}>{analysis.deviceInfo.restartCount}</span></div>
+          )}
+        </div>
+      )}
+      <div className="pt-2 text-[9px] lg:text-[10px] text-slate-600">* Realtime · {logs.length} bản ghi</div>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div
-        className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden shadow-2xl ring-1 ring-slate-700"
-        style={{ borderRadius: "12px", backgroundColor: "#0C0C0C" }}
-      >
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1.5">
+    <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/60 lg:p-4 backdrop-blur-sm">
+      <div className="flex h-[100dvh] lg:h-[85vh] w-full lg:max-w-6xl flex-col overflow-hidden shadow-2xl lg:ring-1 lg:ring-slate-700 lg:rounded-xl" style={{ backgroundColor: "#0C0C0C" }}>
+
+        {/* Title Bar */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-800 bg-slate-900 px-3 lg:px-4 py-2.5 lg:py-3">
+          <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+            <div className="hidden lg:flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-rose-500" />
               <div className="w-3 h-3 rounded-full bg-amber-500" />
               <div className="w-3 h-3 rounded-full bg-emerald-500" />
             </div>
-            <h3 className="font-mono text-[13px] font-semibold text-slate-300">
-              root@{mac}:~/logs
+            <h3 className="font-mono text-[11px] lg:text-[13px] font-semibold text-slate-300 truncate">
+              <span className="lg:hidden">{mac}</span>
+              <span className="hidden lg:inline">root@{mac}:~/logs</span>
             </h3>
+            <span className={`lg:hidden text-[9px] font-black px-1.5 py-0.5 rounded ${analysis.healthScore >= 80 ? "bg-emerald-500/20 text-emerald-400" : analysis.healthScore >= 50 ? "bg-amber-500/20 text-amber-400" : "bg-rose-500/20 text-rose-400"}`}>
+              {analysis.healthScore}%
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
-          >
+          <button type="button" onClick={onClose} className="rounded-md p-2 lg:p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
               <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z" />
             </svg>
           </button>
         </div>
 
+        {/* Mobile Tab Bar */}
+        <div className="lg:hidden flex border-b border-slate-800 bg-slate-900/80">
+          <button type="button" onClick={() => setActiveTab("logs")} className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider text-center transition-colors ${activeTab === "logs" ? "text-emerald-400 border-b-2 border-emerald-400 bg-slate-800/50" : "text-slate-500"}`}>
+            <span className="flex items-center justify-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">terminal</span>
+              Log ({logs.length})
+            </span>
+          </button>
+          <button type="button" onClick={() => setActiveTab("analysis")} className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider text-center transition-colors relative ${activeTab === "analysis" ? "text-blue-400 border-b-2 border-blue-400 bg-slate-800/50" : "text-slate-500"}`}>
+            <span className="flex items-center justify-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">monitoring</span>
+              Phân tích
+              {analysis.issues.length > 0 && (
+                <span className="w-4 h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[8px] font-black">{analysis.issues.length}</span>
+              )}
+            </span>
+          </button>
+        </div>
+
+        {/* Content */}
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          <div className="flex-1 overflow-y-auto p-4 font-mono text-[12px] leading-relaxed">
+          {/* Logs */}
+          <div className={`flex-1 overflow-y-auto p-2 lg:p-4 font-mono text-[11px] lg:text-[12px] leading-relaxed ${activeTab === "logs" ? "block" : "hidden lg:block"}`}>
             {logs.length === 0 ? (
-              <div className="flex items-center gap-3 text-emerald-600/60 animate-pulse">
+              <div className="flex items-center gap-3 text-emerald-600/60 animate-pulse p-2">
                 <span className="inline-block w-2.5 h-4 bg-emerald-600/60" />
-                Đang thiết lập kết nối mã hoá bảo mật tới Server...
+                Đang kết nối tới Server...
               </div>
             ) : (
               <div className="flex flex-col">
@@ -641,21 +959,22 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
                   if (log.level === "ERROR" || log.level === "CRIT") colorClass = "text-rose-400";
                   else if (log.level === "WARN") colorClass = "text-amber-400";
                   else if (log.level === "INFO") colorClass = "text-emerald-400";
-
                   return (
-                    <div
-                      key={log.id}
-                      className="flex gap-3 lg:gap-4 items-start hover:bg-white/5 px-2 py-1 rounded transition-colors group text-[13px]"
-                    >
-                      <span className="text-slate-600 shrink-0 select-none w-[160px] whitespace-nowrap">
-                        [{log.timestamp}]
-                      </span>
-                      <span className={`shrink-0 w-12 font-bold select-none ${colorClass}`}>
-                        {log.level}
-                      </span>
-                      <span className="text-slate-300 break-words group-hover:text-white transition-colors flex-1">
-                        {log.msg}
-                      </span>
+                    <div key={log.id} className="hover:bg-white/5 px-1.5 lg:px-2 py-1 lg:py-1.5 rounded transition-colors group">
+                      {/* Desktop row */}
+                      <div className="hidden lg:flex gap-4 items-start text-[13px]">
+                        <span className="text-slate-600 shrink-0 select-none w-[160px] whitespace-nowrap">[{log.timestamp}]</span>
+                        <span className={`shrink-0 w-12 font-bold select-none ${colorClass}`}>{log.level}</span>
+                        <span className="text-slate-300 break-words group-hover:text-white transition-colors flex-1">{log.msg}</span>
+                      </div>
+                      {/* Mobile stacked */}
+                      <div className="lg:hidden">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`text-[10px] font-black ${colorClass}`}>{log.level}</span>
+                          <span className="text-[9px] text-slate-600 font-mono">{log.timestamp}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 break-words leading-snug">{log.msg}</p>
+                      </div>
                     </div>
                   );
                 })}
@@ -664,36 +983,15 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
             )}
           </div>
 
-          <div className="w-full lg:w-[320px] bg-slate-900/40 border-t lg:border-t-0 lg:border-l border-slate-800 p-5 overflow-y-auto shrink-0 flex flex-col gap-4">
-            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <span className="material-symbols-outlined text-[14px]">menu_book</span>
-              Từ Điển Chẩn Đoán
-            </h4>
-            <ul className="space-y-2.5 text-[12px] text-slate-300">
-              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
-                <span className="text-rose-400 font-mono font-bold block mb-1">HW_REASON: Brownout</span>
-                Nguồn điện nuôi mạch yếu (có thể do đoản mạch hoặc sạc nhái). Mạch phải sập và lên lại.
-              </li>
-              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
-                <span className="text-rose-400 font-mono font-bold block mb-1">HW_REASON: Panic / WDT</span>
-                Tính năng chống treo kích hoạt do chương trình quá tải hoặc kẹt. Đã tự phục hồi khẩn cấp.
-              </li>
-              <li className="bg-rose-500/10 p-2.5 rounded border border-rose-500/20">
-                <span className="text-rose-400 font-mono font-bold block mb-1">CRIT: API_ERR_RESTART</span>
-                Rớt mạng WiFi nhiều lần hoặc Google Server phản hồi quá chậm. Mạch cắt luồng tự khởi động lại.
-              </li>
-              <li className="bg-amber-500/10 p-2.5 rounded border border-amber-500/20">
-                <span className="text-amber-400 font-mono font-bold block mb-1">WARN: Low Heap</span>
-                Bộ nhớ RAM đang cạn kiệt. Nếu tiếp tục cạn, mạch sẽ kích hoạt WDT phục hồi tự động.
-              </li>
-              <li className="bg-emerald-500/10 p-2.5 rounded border border-emerald-500/20">
-                <span className="text-emerald-400 font-mono font-bold block mb-1">INFO: Heartbeat OK</span>
-                Tình trạng hoàn hảo. Kết nối máy chủ tốt, RAM cân bằng, thiết bị cực kỳ xịn mịn.
-              </li>
-            </ul>
-            <div className="mt-auto pt-4 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed">
-              * Mạch được trang bị áo giáp 3 lớp: Watchdog 15s (Chống treo vĩnh viễn), Loop Counter (Chống kiệt RAM), Supervisor Task (Chống sập tầng mạng).
+          {/* Analysis Sidebar (desktop) / Tab Content (mobile) */}
+          <div className={`lg:w-[380px] bg-slate-900/40 lg:border-l border-slate-800 overflow-y-auto shrink-0 flex flex-col ${activeTab === "analysis" ? "flex flex-1" : "hidden lg:flex"}`}>
+            <div className="hidden lg:block px-5 pt-5 pb-3 border-b border-slate-800">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <span className="material-symbols-outlined text-[14px]">monitoring</span>
+                Phân Tích Tổng Hợp
+              </h4>
             </div>
+            {AnalysisContent}
           </div>
         </div>
       </div>
