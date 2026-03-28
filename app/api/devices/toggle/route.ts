@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { isAuthenticated } from "@/lib/auth";
-import { toggleDeviceLock } from "@/lib/google-sheets";
+import { isAuthenticated, getAuthenticatedAdminEmail } from "@/lib/auth";
+import { toggleDeviceLock, logAdminAction } from "@/lib/google-sheets";
 
 export async function POST(request: Request) {
   const authenticated = await isAuthenticated();
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await toggleDeviceLock(mac);
+    const user = await getAuthenticatedAdminEmail() || "Unknown";
+    await logAdminAction(mac, user, "Toggle Lock", `Phòng ${result.room || "Không rõ"}: Thay đổi trạng thái thành ${result.status}`);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update device";

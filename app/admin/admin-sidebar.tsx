@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Tổng quan", icon: "dashboard", exact: true },
   { href: "/admin/chart", label: "Biểu đồ", icon: "bar_chart", exact: false },
   { href: "/admin/sheet1", label: "Phiên hoạt động", icon: "history", exact: false },
+  { href: "/admin/activity", label: "Nhật ký Hệ thống", icon: "manage_search", exact: false },
   { href: "/admin/ota", label: "OTA Firmware", icon: "system_update_alt", exact: false },
 ];
 

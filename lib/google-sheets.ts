@@ -11,13 +11,13 @@ export async function listDeviceLogs(mac?: string, limit: number = 100) {
   // Lọc theo MAC nếu có
   if (mac) {
     const macNorm = mac.trim().toUpperCase();
-    rows = rows.filter(row => (row[1] || "").toUpperCase() === macNorm);
+    rows = rows.filter(row => parseMacFromSheet(row[1]) === macNorm);
   }
   // Lấy dòng mới nhất trước
   rows = rows.slice(-limit).reverse();
   return rows.map(row => ({
     timestamp: row[0],
-    mac: row[1],
+    mac: parseMacFromSheet(row[1]),
     room: row[2],
     level: row[3],
     message: row[4],
@@ -124,6 +124,7 @@ function getSheetsConfig() {
     spreadsheetId: getRequiredEnv("GOOGLE_SHEETS_SPREADSHEET_ID"),
     sheetName: process.env.GOOGLE_SHEETS_DEVICE_SHEET || "MAC_REGISTRY",
     activitySheetName: process.env.GOOGLE_SHEETS_ACTIVITY_SHEET || "Sheet1",
+    adminActivitySheetName: process.env.GOOGLE_SHEETS_ADMIN_ACTIVITY_SHEET || "ADMIN_ACTIVITY",
     tzOffsetMinutes: Number(process.env.GOOGLE_SHEETS_TZ_OFFSET_MINUTES || "420"),
     clientEmail: getRequiredEnv("GOOGLE_SHEETS_CLIENT_EMAIL"),
     privateKey: getRequiredEnv("GOOGLE_SHEETS_PRIVATE_KEY").replace(/\\n/g, "\n"),
@@ -170,6 +171,14 @@ async function getSheetId(
 function toText(value: unknown) {
   if (value === undefined || value === null) return "";
   return String(value).trim();
+}
+
+function parseMacFromSheet(value: unknown) {
+  let s = toText(value).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+  if (s.length > 0 && s.length < 12) {
+    s = s.padStart(12, '0');
+  }
+  return s;
 }
 
 function resolveCanonicalRawChatId(chatId: string) {
@@ -223,7 +232,7 @@ export async function listDevices(): Promise<DeviceRow[]> {
   return rows
     .map((row, index) => ({
       rowNumber: index + 2,
-      mac: toText(row[0]),
+      mac: parseMacFromSheet(row[0]),
       room: toText(row[1]),
       status: toText(row[2]),
       license: toText(row[3]),
@@ -275,7 +284,7 @@ export async function updateDeviceDebug(mac: string, debug: boolean) {
     },
   });
 
-  return { mac: target.mac, debug };
+  return { mac: target.mac, debug, room: target.room };
 }
 
 export async function toggleDeviceLock(mac: string) {
@@ -306,7 +315,7 @@ export async function toggleDeviceLock(mac: string) {
       throw new Error(result.error);
     }
 
-    return { mac: target.mac, status: result.newStatus ?? nextStatus };
+    return { mac: target.mac, status: result.newStatus ?? nextStatus, room: target.room };
   }
 
   const { spreadsheetId, sheetName } = getSheetsConfig();
@@ -321,7 +330,7 @@ export async function toggleDeviceLock(mac: string) {
     },
   });
 
-  return { mac: target.mac, status: nextStatus };
+  return { mac: target.mac, status: nextStatus, room: target.room };
 }
 
 export async function updateDeviceLicense(mac: string, license: string) {
@@ -352,7 +361,7 @@ export async function updateDeviceLicense(mac: string, license: string) {
     },
   });
 
-  return { mac: target.mac, license: normalizedLicense };
+  return { mac: target.mac, license: normalizedLicense, room: target.room };
 }
 
 export async function updateExpireDate(mac: string, expireDate: string) {
@@ -370,7 +379,7 @@ export async function updateExpireDate(mac: string, expireDate: string) {
     },
   });
 
-  return { mac: target.mac, expireDate };
+  return { mac: target.mac, expireDate, room: target.room };
 }
 
 export async function deleteDevice(mac: string) {
@@ -398,7 +407,7 @@ export async function deleteDevice(mac: string) {
     },
   });
 
-  return { mac: target.mac, deleted: true };
+  return { mac: target.mac, deleted: true, room: target.room };
 }
 
 function mergeSessions(
@@ -828,4 +837,103 @@ export async function getDailyDebugByChatId(chatId: string, reportDate?: string)
     rooms,
     rawRows,
   };
+}
+
+export type AdminActivityRow = {
+  timestamp: string;
+  user: string;
+  mac: string;
+  action: string;
+  details: string;
+};
+
+export async function logAdminAction(mac: string, user: string, action: string, details: string) {
+  const { spreadsheetId, adminActivitySheetName, tzOffsetMinutes } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  const now = new Date();
+  const shifted = new Date(now.getTime() + tzOffsetMinutes * 60 * 1000);
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const y = shifted.getUTCFullYear();
+  const hh = String(shifted.getUTCHours()).padStart(2, "0");
+  const mm = String(shifted.getUTCMinutes()).padStart(2, "0");
+  const ss = String(shifted.getUTCSeconds()).padStart(2, "0");
+  const timestamp = `${hh}:${mm}:${ss} ${d}/${m}/${y}`;
+
+  // Prepend apostrophe to force Google Sheets to treat MAC as a string
+  const values = [[timestamp, user, `'${mac}`, action, details]];
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${adminActivitySheetName}!A:E`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values },
+    });
+  } catch (err: any) {
+    if (String(err?.message).includes("Unable to parse range")) {
+      // Create sheet 
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: adminActivitySheetName,
+                },
+              },
+            },
+          ],
+        },
+      });
+      // Put Headers
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${adminActivitySheetName}!A1:E1`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [["TIMESTAMP", "USER", "MAC", "ACTION", "DETAILS"]],
+        },
+      });
+      // Append again
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${adminActivitySheetName}!A:E`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values },
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+export async function listAdminActivities(limit: number = 200): Promise<AdminActivityRow[]> {
+  const { spreadsheetId, adminActivitySheetName } = getSheetsConfig();
+  const sheets = await getSheetsClient();
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${adminActivitySheetName}!A2:E`,
+    });
+
+    let rows = response.data.values || [];
+    rows = rows.slice(-limit).reverse();
+
+    return rows.map((row) => ({
+      timestamp: toText(row[0]),
+      user: toText(row[1]),
+      mac: parseMacFromSheet(row[2]),
+      action: toText(row[3]),
+      details: toText(row[4]),
+    }));
+  } catch (err: any) {
+    if (String(err?.message).includes("Unable to parse range")) {
+      return [];
+    }
+    throw err;
+  }
 }

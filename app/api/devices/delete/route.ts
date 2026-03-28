@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { isAuthenticated } from "@/lib/auth";
-import { deleteDevice } from "@/lib/google-sheets";
+import { isAuthenticated, getAuthenticatedAdminEmail } from "@/lib/auth";
+import { deleteDevice, logAdminAction } from "@/lib/google-sheets";
 
 export async function POST(request: Request) {
   const authenticated = await isAuthenticated();
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await deleteDevice(mac);
+    const user = await getAuthenticatedAdminEmail() || "Unknown";
+    await logAdminAction(mac, user, "Delete Device", `Phòng ${result.room || "Không rõ"}: Xóa thiết bị khỏi hệ thống`);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete device";

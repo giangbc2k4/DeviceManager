@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { isAuthenticated } from "@/lib/auth";
-import { updateExpireDate } from "@/lib/google-sheets";
+import { isAuthenticated, getAuthenticatedAdminEmail } from "@/lib/auth";
+import { updateExpireDate, logAdminAction } from "@/lib/google-sheets";
 
 export async function POST(request: Request) {
   const authenticated = await isAuthenticated();
@@ -20,6 +20,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await updateExpireDate(mac, expireDate);
+    const user = await getAuthenticatedAdminEmail() || "Unknown";
+    await logAdminAction(mac, user, "Update Expire Date", `Phòng ${result.room || "Không rõ"}: Gia hạn ngày hết hạn tới ${expireDate}`);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update expire date";
