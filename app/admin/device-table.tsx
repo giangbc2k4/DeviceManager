@@ -554,6 +554,7 @@ type AnalysisResult = {
     lastHeap: string;
     uptime: string;
     restartCount: number | null;
+    lastOffline: string;
   };
 };
 
@@ -572,12 +573,15 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
   let supervisorRestartCount = 0;
   let deviceExpiredCount = 0;
   let httpErrCount = 0;
+  let offlineSessionCount = 0;
+  let offlineTotalMin = 0;
 
   // Device info extraction
   let fwVersion = "";
   let lastHeap = "";
   let uptime = "";
   let restartCount: number | null = null;
+  let lastOffline = "";
 
   for (const log of logs) {
     const lvl = (log.level || "").toUpperCase();
@@ -597,6 +601,19 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
     if (/supervisor|no.*ok.*heartbeat|no.*hb/i.test(msg) && lvl === "CRIT") supervisorRestartCount++;
     if (/device.?expired/i.test(msg)) deviceExpiredCount++;
     if (/hb.*http.*err|http.*error/i.test(msg)) httpErrCount++;
+
+    // Offline session detection
+    if (/OFFLINE_SESSION/i.test(msg)) {
+      offlineSessionCount++;
+      const durMatch = msg.match(/Duration:\s*(\d+)\s*min/);
+      if (durMatch) {
+        const mins = parseInt(durMatch[1]);
+        offlineTotalMin += mins;
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        lastOffline = h > 0 ? `${h}h ${m}m` : `${m} phút`;
+      }
+    }
 
     // --- Extract device info ---
     const fwMatch = msg.match(/FW:\s*([0-9][0-9.]+)/);
@@ -701,6 +718,18 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
     });
   }
 
+  if (offlineSessionCount > 0) {
+    const totalH = Math.floor(offlineTotalMin / 60);
+    const totalM = offlineTotalMin % 60;
+    const totalText = totalH > 0 ? `${totalH}h ${totalM}m` : `${totalM} phút`;
+    issues.push({
+      severity: "info",
+      title: "Phiên offline (mất WiFi khi phòng đang mở)",
+      description: `Phát hiện ${offlineSessionCount} lần mất WiFi kéo dài ≥ 10 phút (tổng ~${totalText}). Phòng vẫn được tính thời gian mở trong khi mất kết nối. Kiểm tra router và khoảng cách WiFi.`,
+      count: offlineSessionCount,
+    });
+  }
+
   if (restartCount !== null && restartCount > 5) {
     issues.push({
       severity: "info",
@@ -721,6 +750,7 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
   score -= wifiLostCount * 3;
   score -= httpErrCount * 3;
   score -= deviceExpiredCount * 5;
+  score -= offlineSessionCount * 4;
   score = Math.max(0, Math.min(100, score));
 
   let healthLabel = "";
@@ -749,7 +779,7 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
       const order = { critical: 0, warning: 1, info: 2 };
       return order[a.severity] - order[b.severity];
     }),
-    deviceInfo: { fwVersion, lastHeap, uptime, restartCount },
+    deviceInfo: { fwVersion, lastHeap, uptime, restartCount, lastOffline },
   };
 }
 
@@ -891,6 +921,9 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
           {analysis.deviceInfo.restartCount !== null && (
             <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">Restart</span><span className={`font-mono font-bold ${analysis.deviceInfo.restartCount > 3 ? "text-rose-400" : "text-slate-300"}`}>{analysis.deviceInfo.restartCount}</span></div>
           )}
+          {analysis.deviceInfo.lastOffline && (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">wifi_off</span>Offline</span><span className="text-cyan-400 font-mono font-bold">{analysis.deviceInfo.lastOffline}</span></div>
+          )}
         </div>
       )}
       <div className="pt-2 text-[9px] lg:text-[10px] text-slate-600">* Realtime · {logs.length} bản ghi</div>
@@ -955,10 +988,100 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
             ) : (
               <div className="flex flex-col">
                 {logs.map((log) => {
+                  const isOfflineSession = /OFFLINE_SESSION/i.test(log.msg);
+                  const isPwrHistHeader = /POWER HISTORY|={5,}/i.test(log.msg) && /session/i.test(log.msg);
+                  const isPwrHistSeparator = /^-{5,}\s*\d+\s*-{5,}$/.test(log.msg.trim());
+                  const isPwrHistStart = /^StartTime\s*=/i.test(log.msg.trim());
+                  const isPwrHistLast = /^LastTime\s*=/i.test(log.msg.trim());
+                  const isPwrHist = isPwrHistHeader || isPwrHistSeparator || isPwrHistStart || isPwrHistLast;
+
                   let colorClass = "text-slate-300";
-                  if (log.level === "ERROR" || log.level === "CRIT") colorClass = "text-rose-400";
+                  if (isOfflineSession) colorClass = "text-cyan-400";
+                  else if (isPwrHist) colorClass = "text-violet-400";
+                  else if (log.level === "ERROR" || log.level === "CRIT") colorClass = "text-rose-400";
                   else if (log.level === "WARN") colorClass = "text-amber-400";
                   else if (log.level === "INFO") colorClass = "text-emerald-400";
+
+                  // Parse offline session details for rich display
+                  const offlineDurMatch = isOfflineSession ? log.msg.match(/Duration:\s*(\d+)\s*min/) : null;
+                  const offlineRoomMatch = isOfflineSession ? log.msg.match(/Room:\s*([^|]+)/) : null;
+                  const offlineDur = offlineDurMatch ? parseInt(offlineDurMatch[1]) : 0;
+                  const offlineRoom = offlineRoomMatch ? offlineRoomMatch[1].trim() : "";
+
+                  if (isOfflineSession) {
+                    const durH = Math.floor(offlineDur / 60);
+                    const durM = offlineDur % 60;
+                    const durText = durH > 0 ? `${durH}h ${durM}m` : `${durM} phút`;
+                    return (
+                      <div key={log.id} className="mx-1 lg:mx-2 my-1.5 lg:my-2 rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-3 py-2.5 lg:px-4 lg:py-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="material-symbols-outlined text-cyan-400 text-[16px] lg:text-[18px]">wifi_off</span>
+                          <span className="text-[11px] lg:text-[13px] font-bold text-cyan-300">Phiên Offline — Phòng vẫn mở khi mất WiFi</span>
+                        </div>
+                        <div className="flex flex-wrap gap-3 lg:gap-4 text-[10px] lg:text-[12px]">
+                          <div><span className="text-slate-500">Phòng: </span><span className="text-cyan-200 font-semibold">{offlineRoom || "N/A"}</span></div>
+                          <div><span className="text-slate-500">Thời lượng: </span><span className="text-cyan-200 font-bold">{durText}</span></div>
+                          <div><span className="text-slate-500">Ghi nhận: </span><span className="text-slate-400 font-mono">{log.timestamp}</span></div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Power History header/footer
+                  if (isPwrHistHeader) {
+                    return (
+                      <div key={log.id} className="mx-1 lg:mx-2 my-2 lg:my-3 px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg border border-violet-500/30 bg-violet-500/10">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-violet-400 text-[16px] lg:text-[18px]">electric_bolt</span>
+                          <span className="text-[11px] lg:text-[13px] font-bold text-violet-300 uppercase tracking-wider">Lịch sử bật/tắt (10 phiên gần nhất)</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Power History separator (---------- N ----------)
+                  if (isPwrHistSeparator) {
+                    const numMatch = log.msg.match(/(\d+)/);
+                    const sessionNum = numMatch ? numMatch[1] : "?";
+                    return (
+                      <div key={log.id} className="mx-1 lg:mx-2 mt-2 mb-0.5 flex items-center gap-2 px-2">
+                        <div className="flex-1 h-px bg-violet-500/20" />
+                        <span className="text-[10px] lg:text-[11px] font-bold text-violet-400/70 uppercase tracking-widest">Phiên #{sessionNum}</span>
+                        <div className="flex-1 h-px bg-violet-500/20" />
+                      </div>
+                    );
+                  }
+
+                  // Power History StartTime / LastTime lines
+                  if (isPwrHistStart || isPwrHistLast) {
+                    const valMatch = log.msg.match(/=\s*(\d+)/);
+                    const msVal = valMatch ? parseInt(valMatch[1]) : 0;
+                    const uptimeMatch = log.msg.match(/Uptime:\s*(\d+h\s*\d+m\s*\d+s)/);
+                    const label = isPwrHistStart ? "Khởi động" : "Cập nhật cuối";
+                    const icon = isPwrHistStart ? "power_settings_new" : "update";
+
+                    // Format millis to readable
+                    const sec = Math.floor(msVal / 1000);
+                    const h = Math.floor(sec / 3600);
+                    const m = Math.floor((sec % 3600) / 60);
+                    const s = sec % 60;
+                    const msText = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+
+                    return (
+                      <div key={log.id} className="mx-1 lg:mx-2 px-3 lg:px-4 py-1 lg:py-1.5">
+                        <div className="flex items-center gap-2 text-[10px] lg:text-[12px]">
+                          <span className="material-symbols-outlined text-violet-400/60 text-[14px]">{icon}</span>
+                          <span className="text-violet-300/60 w-24 lg:w-28 shrink-0">{label}</span>
+                          <span className="text-violet-200 font-mono font-semibold">{msText}</span>
+                          <span className="text-slate-600 font-mono text-[9px] lg:text-[10px]">({msVal}ms)</span>
+                          {uptimeMatch && (
+                            <span className="ml-auto text-[9px] lg:text-[10px] text-violet-400/80 font-bold bg-violet-500/10 px-2 py-0.5 rounded">⏱ {uptimeMatch[1]}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={log.id} className="hover:bg-white/5 px-1.5 lg:px-2 py-1 lg:py-1.5 rounded transition-colors group">
                       {/* Desktop row */}

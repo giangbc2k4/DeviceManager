@@ -15,7 +15,8 @@ Mặc định để tiết kiệm bộ nhớ RAM và không làm nóng mạch, t
 ### Bước 2: Hiển thị Log theo thời gian thực (Terminal)
 - Bên cạnh nút Khóa/Mở Khóa, có biểu tượng hình **Cửa sổ lệnh (Terminal \_\_ )**.
 - Bấm vào đó, một cửa sổ đen với dòng chữ xanh lá cây sẽ hiện ra nối thẳng trực tiếp tới não bộ của ESP32.
-- Bất cứ sự thay đổi nào (Mạng rớt, Mất điện, Có thao tác HTML, Heartbeat check) đều được thiết bị gửi lên trên màn hình y như Console
+- Bất cứ sự thay đổi nào (Mạng rớt, Mất điện, Có thao tác HTML, Heartbeat check) đều được thiết bị gửi lên màn hình y như Console.
+
 ---
 
 ## 2. Sổ Tay Chẩn Đoán (Đọc bệnh mạch điện)
