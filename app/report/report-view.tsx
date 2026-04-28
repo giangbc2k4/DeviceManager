@@ -25,11 +25,11 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
   const windowDurationMs = Math.max(windowEndMs - windowStartMs, 1);
   const hasRoomData = hasChatId && debug.rooms.length > 0;
 
-  const timelineTicks = Array.from({ length: 13 }, (_, i) => {
-    const hourOffset = i * 2;
-    const hour = (6 + hourOffset) % 24;
-    const label = `${String(hour).padStart(2, "0")}:00`;
-    return { label, hourOffset };
+  const timelineTicks = Array.from({ length: 25 }, (_, i) => {
+    const hour = (6 + i) % 24;
+    const label = `${hour}h`;
+    const pct = (i / 24) * 100;
+    return { label, hour, pct };
   });
 
   return (
@@ -79,14 +79,16 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
           {hasRoomData ? (
             <TimelineScroll className="mt-6 overflow-x-auto rounded-xl border border-slate-100 shadow-sm p-4">
               <div className="min-w-[820px]">
-                <div
-                  className="ml-[130px] mb-2 grid text-[11px] font-semibold text-slate-500"
-                  style={{ gridTemplateColumns: `repeat(${timelineTicks.length}, minmax(0, 1fr))` }}
-                >
+                {/* Timeline hour labels */}
+                <div className="ml-[130px] mb-2 relative h-5">
                   {timelineTicks.map((tick) => (
-                    <div className="text-center" key={tick.label + String(tick.hourOffset)}>
+                    <span
+                      className="absolute text-[11px] font-semibold text-slate-500 -translate-x-1/2"
+                      key={`label-${tick.hour}-${tick.pct}`}
+                      style={{ left: `${tick.pct}%` }}
+                    >
                       {tick.label}
-                    </div>
+                    </span>
                   ))}
                 </div>
 
@@ -99,17 +101,14 @@ export default async function ReportView({ chatId, reportDate }: ReportViewProps
                       </div>
 
                       <div className="relative h-10 overflow-hidden rounded-lg bg-slate-100">
-                        {timelineTicks.slice(1, -1).map((tick) => {
-                          const left = ((tick.hourOffset * 60 * 60 * 1000) / windowDurationMs) * 100;
-                          const strong = tick.hourOffset % 6 === 0;
-                          return (
-                            <div
-                              className={`absolute top-0 h-full w-px ${strong ? "bg-slate-400" : "bg-slate-300/70"}`}
-                              key={`grid-${room.room}-${tick.hourOffset}`}
-                              style={{ left: `${left}%` }}
-                            />
-                          );
-                        })}
+                        {/* Vertical grid lines at each hour */}
+                        {timelineTicks.slice(1, -1).map((tick) => (
+                          <div
+                            className={`absolute top-0 h-full w-px ${tick.hour % 6 === 0 ? "bg-slate-400" : "bg-slate-300/70"}`}
+                            key={`grid-${room.room}-${tick.pct}`}
+                            style={{ left: `${tick.pct}%` }}
+                          />
+                        ))}
 
                         {room.mergedSessions.map((session, idx) => {
                           const startMs = new Date(session.startIso).getTime();

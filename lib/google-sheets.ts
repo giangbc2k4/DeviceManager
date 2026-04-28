@@ -37,6 +37,7 @@ export type DeviceRow = {
   license: string;
   startDate: string;
   expireDate: string;
+  chatId: string;
   version: string;
   debug: boolean;
 };
@@ -238,6 +239,7 @@ export async function listDevices(): Promise<DeviceRow[]> {
       license: toText(row[3]),
       startDate: toText(row[4]),
       expireDate: toText(row[5]),
+      chatId: toText(row[6]),
       version: toText(row[8]),
       debug: toText(row[7]).toUpperCase() === "ON",
     }))

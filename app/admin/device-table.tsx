@@ -18,6 +18,8 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
   const [editingExpire, setEditingExpire] = useState<string>("");
   const [logModalMac, setLogModalMac] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [roomIdFilter, setRoomIdFilter] = useState<string>("");
+  const [showRoomIdFilter, setShowRoomIdFilter] = useState(false);
 
   type ToastType = { message: string; type: "success" | "error" | "info" } | null;
   const [toast, setToast] = useState<ToastType>(null);
@@ -35,8 +37,15 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
     setToastVisible(false);
   }
 
-  // Sort: Phòng đang mở lên đầu, LOCKED xuống cuối
-  const sortedDevices = [...devices].sort((a, b) => {
+  // Unique RoomIDs for filter dropdown
+  const uniqueRoomIds = [...new Set(devices.map(d => d.chatId).filter(Boolean))];
+
+  // Filter by RoomID, then sort
+  const filteredDevices = roomIdFilter
+    ? devices.filter(d => d.chatId === roomIdFilter)
+    : devices;
+
+  const sortedDevices = [...filteredDevices].sort((a, b) => {
     const aOpen = openRooms.includes(a.room) ? 0 : 1;
     const bOpen = openRooms.includes(b.room) ? 0 : 1;
     if (aOpen !== bOpen) return aOpen - bOpen;
@@ -70,6 +79,19 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
     const [y, m, d] = parts;
     return `${d}/${m}/${y}`;
   }
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!showRoomIdFilter) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-roomid-filter]")) {
+        setShowRoomIdFilter(false);
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [showRoomIdFilter]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -248,28 +270,63 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
         <table className="w-full text-left border-separate border-spacing-0">
           <thead>
             <tr className="bg-slate-50/80">
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                MAC Address
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                Thiết bị
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                 Vị trí (Phòng)
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                Trạng thái
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 relative" data-roomid-filter>
+                  <span>RoomID</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoomIdFilter(!showRoomIdFilter)}
+                    className={`p-0.5 rounded hover:bg-slate-200 transition-colors ${roomIdFilter ? "text-blue-600" : "text-slate-400"}`}
+                    title="Lọc theo RoomID"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">filter_list</span>
+                  </button>
+                  {roomIdFilter && (
+                    <button
+                      type="button"
+                      onClick={() => { setRoomIdFilter(""); setShowRoomIdFilter(false); }}
+                      className="p-0.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                      title="Xóa bộ lọc"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  )}
+                  {showRoomIdFilter && (
+                    <div className="absolute top-full left-0 mt-1 z-20 bg-white rounded-lg shadow-xl border border-slate-200 py-1 min-w-[200px] max-h-[240px] overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => { setRoomIdFilter(""); setShowRoomIdFilter(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors ${!roomIdFilter ? "text-blue-600 font-bold bg-blue-50/50" : "text-slate-600"}`}
+                      >
+                        Tất cả ({devices.length})
+                      </button>
+                      {uniqueRoomIds.map(id => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => { setRoomIdFilter(id); setShowRoomIdFilter(false); }}
+                          className={`w-full text-left px-3 py-2 text-xs font-mono hover:bg-slate-50 transition-colors ${roomIdFilter === id ? "text-blue-600 font-bold bg-blue-50/50" : "text-slate-600"}`}
+                        >
+                          {id} ({devices.filter(d => d.chatId === id).length})
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                Gói bản quyền
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                Bản quyền / Hết hạn
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                Hết hạn
-              </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">
-                Phiên bản
-              </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">
                 Debug
               </th>
-              <th className="px-4 lg:px-8 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">
+              <th className="px-4 lg:px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">
                 Thao tác
               </th>
             </tr>
@@ -293,13 +350,28 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
                       : "hover:bg-slate-50/60 border-l-[4px] border-l-transparent"
                   }`}
                 >
-                  {/* MAC */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5 font-mono text-xs text-slate-600 font-semibold">
-                    {device.mac}
+                  {/* Thiết bị: MAC + Status + Version */}
+                  <td className="px-4 lg:px-6 py-4 lg:py-5">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="font-mono text-xs text-slate-600 font-semibold">{device.mac}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            isLocked ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                          }`}
+                        >
+                          <span className={`w-1 h-1 rounded-full ${isLocked ? "bg-rose-500" : "bg-emerald-500"}`} />
+                          {device.status || "UNKNOWN"}
+                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-[9px] font-mono font-bold text-slate-500">
+                          {device.version ? `v${device.version}` : "N/A"}
+                        </span>
+                      </div>
+                    </div>
                   </td>
 
-                  {/* Room */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5">
+                  {/* Vị trí (Phòng) */}
+                  <td className="px-4 lg:px-6 py-4 lg:py-5">
                     <div className="flex flex-col gap-1.5 items-start">
                       <span className={`text-sm font-medium ${isRoomOpen ? "text-emerald-900" : "text-slate-900"}`}>
                         {device.room || "-"}
@@ -313,130 +385,108 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
                     </div>
                   </td>
 
-                  {/* Status */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                        isLocked
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isLocked ? "bg-rose-500" : "bg-emerald-500"
-                        }`}
-                      />
-                      {device.status || "UNKNOWN"}
-                    </span>
+                  {/* RoomID (ChatID) */}
+                  <td className="px-4 lg:px-6 py-4 lg:py-5">
+                    <span className="font-mono text-xs text-slate-500">{device.chatId || "-"}</span>
                   </td>
 
-                  {/* License */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5">
+                  {/* Bản quyền / Hết hạn */}
+                  <td className="px-4 lg:px-6 py-4 lg:py-5">
                     <div className="flex flex-col items-start gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          isLifetime
-                            ? "bg-purple-100 text-purple-700"
-                            : isTrial
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {currentLicense}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
-                            isTrial
-                              ? "bg-amber-600 text-white"
-                              : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
-                          } disabled:cursor-not-allowed disabled:opacity-50`}
-                          disabled={isBusy || isTrial}
-                          onClick={() => handleChangeLicense(device.mac, "TRIAL")}
-                          type="button"
-                        >
-                          TRIAL
-                        </button>
-                        <button
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                             isLifetime
-                              ? "bg-purple-600 text-white"
-                              : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
-                          } disabled:cursor-not-allowed disabled:opacity-50`}
-                          disabled={isBusy || isLifetime}
-                          onClick={() => handleChangeLicense(device.mac, "LIFETIME")}
-                          type="button"
+                              ? "bg-purple-100 text-purple-700"
+                              : isTrial
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
                         >
-                          LIFETIME
-                        </button>
+                          {currentLicense}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors ${
+                              isTrial
+                                ? "bg-amber-600 text-white"
+                                : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                            disabled={isBusy || isTrial}
+                            onClick={() => handleChangeLicense(device.mac, "TRIAL")}
+                            type="button"
+                          >
+                            TRIAL
+                          </button>
+                          <button
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors ${
+                              isLifetime
+                                ? "bg-purple-600 text-white"
+                                : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                            disabled={isBusy || isLifetime}
+                            onClick={() => handleChangeLicense(device.mac, "LIFETIME")}
+                            type="button"
+                          >
+                            LIFETIME
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-slate-600">{device.expireDate || "-"}</span>
+                        {editingExpire === device.mac ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {[
+                              { label: "+7d", days: 7 },
+                              { label: "+30d", days: 30 },
+                              { label: "+90d", days: 90 },
+                              { label: "+1y", days: 365 },
+                            ].map((preset) => (
+                              <button
+                                key={preset.days}
+                                type="button"
+                                className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-200 disabled:opacity-50"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  handleChangeExpireDate(device.mac, addDaysFromNow(preset.days))
+                                }
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                            <input
+                              type="date"
+                              className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px]"
+                              disabled={isBusy}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleChangeExpireDate(device.mac, toSheetDate(e.target.value));
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-300"
+                              onClick={() => setEditingExpire("")}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200"
+                            onClick={() => setEditingExpire(device.mac)}
+                          >
+                            Sửa ngày
+                          </button>
+                        )}
                       </div>
                     </div>
                   </td>
 
-                  {/* Expire */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5">
-                    <div className="flex flex-col items-start gap-1.5">
-                      <span className="text-xs text-slate-600">{device.expireDate || "-"}</span>
-                      {editingExpire === device.mac ? (
-                        <div className="flex flex-wrap items-center gap-1">
-                          {[
-                            { label: "+7d", days: 7 },
-                            { label: "+30d", days: 30 },
-                            { label: "+90d", days: 90 },
-                            { label: "+1y", days: 365 },
-                          ].map((preset) => (
-                            <button
-                              key={preset.days}
-                              type="button"
-                              className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-200 disabled:opacity-50"
-                              disabled={isBusy}
-                              onClick={() =>
-                                handleChangeExpireDate(device.mac, addDaysFromNow(preset.days))
-                              }
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                          <input
-                            type="date"
-                            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px]"
-                            disabled={isBusy}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                handleChangeExpireDate(device.mac, toSheetDate(e.target.value));
-                              }
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-300"
-                            onClick={() => setEditingExpire("")}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200"
-                          onClick={() => setEditingExpire(device.mac)}
-                        >
-                          Sửa ngày
-                        </button>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Phiên bản */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5 text-center">
-                    <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-[11px] font-mono font-bold text-slate-600">
-                      {device.version ? `v${device.version}` : "N/A"}
-                    </span>
-                  </td>
-
                   {/* Debug Toggle */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5 text-center">
+                  <td className="px-4 lg:px-6 py-4 lg:py-5 text-center">
                     <button
                       type="button"
                       title={isDebugOn ? "Tắt debug" : "Bật debug"}
@@ -455,7 +505,7 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 lg:px-8 py-4 lg:py-5 text-right">
+                  <td className="px-4 lg:px-6 py-4 lg:py-5 text-right">
                     <div className="flex justify-end gap-1.5">
                       <button
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all disabled:opacity-50"
@@ -500,9 +550,9 @@ export function DeviceTable({ devices, openRooms }: DeviceTableProps) {
       </div>
 
       {/* Table Footer */}
-      <div className="px-4 lg:px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+      <div className="px-4 lg:px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
         <p className="text-xs text-slate-500 font-medium">
-          Hiển thị {visibleDevices.length} / {sortedDevices.length} thiết bị
+          Hiển thị {visibleDevices.length} / {sortedDevices.length} thiết bị{roomIdFilter ? ` (lọc từ ${devices.length})` : ""}
         </p>
         {hasMore && (
           <button
