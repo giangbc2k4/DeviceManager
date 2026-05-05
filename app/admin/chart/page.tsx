@@ -16,7 +16,11 @@ function formatHours(minutes: number) {
 }
 
 function formatTimeLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  const utc = new Date(iso);
+  const local = new Date(utc.getTime() + 7 * 60 * 60 * 1000);
+  const hh = String(local.getUTCHours()).padStart(2, "0");
+  const mm = String(local.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 export default async function AdminChartPage({ searchParams }: ChartPageProps) {
