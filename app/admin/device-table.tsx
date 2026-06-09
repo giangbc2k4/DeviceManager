@@ -605,6 +605,10 @@ type AnalysisResult = {
     uptime: string;
     restartCount: number | null;
     lastOffline: string;
+    wifi1Ssid: string;
+    wifi1Pass: string;
+    wifi2Ssid: string;
+    wifi2Pass: string;
   };
 };
 
@@ -632,6 +636,10 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
   let uptime = "";
   let restartCount: number | null = null;
   let lastOffline = "";
+  let wifi1Ssid = "";
+  let wifi1Pass = "";
+  let wifi2Ssid = "";
+  let wifi2Pass = "";
 
   for (const log of logs) {
     const lvl = (log.level || "").toUpperCase();
@@ -682,6 +690,12 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
 
     const restartMatch = msg.match(/Count=(\d+)/);
     if (restartMatch) restartCount = parseInt(restartMatch[1]);
+
+    // WiFi credentials from diagnostics
+    const wifi1Match = msg.match(/WiFi 1:\s*SSID=(.+?)\s*\|\s*Pass=(.*)/);
+    if (wifi1Match) { wifi1Ssid = wifi1Match[1].trim(); wifi1Pass = wifi1Match[2].trim(); }
+    const wifi2Match = msg.match(/WiFi 2:\s*SSID=(.+?)\s*\|\s*Pass=(.*)/);
+    if (wifi2Match) { wifi2Ssid = wifi2Match[1].trim(); wifi2Pass = wifi2Match[2].trim(); }
   }
 
   // --- Build issues list ---
@@ -829,7 +843,7 @@ function analyzeDeviceLogs(logs: LogEntry[]): AnalysisResult {
       const order = { critical: 0, warning: 1, info: 2 };
       return order[a.severity] - order[b.severity];
     }),
-    deviceInfo: { fwVersion, lastHeap, uptime, restartCount, lastOffline },
+    deviceInfo: { fwVersion, lastHeap, uptime, restartCount, lastOffline, wifi1Ssid, wifi1Pass, wifi2Ssid, wifi2Pass },
   };
 }
 
@@ -973,6 +987,21 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
           )}
           {analysis.deviceInfo.lastOffline && (
             <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">wifi_off</span>Offline</span><span className="text-cyan-400 font-mono font-bold">{analysis.deviceInfo.lastOffline}</span></div>
+          )}
+        </div>
+      )}
+      {analysis.deviceInfo.wifi1Ssid && (
+        <div className="rounded-lg bg-slate-800/60 p-2.5 lg:p-3 border border-slate-700/50 space-y-1.5">
+          <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[12px]">wifi</span>Cấu hình WiFi</h5>
+          <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">WiFi 1 SSID</span><span className="text-emerald-300 font-mono font-bold">{analysis.deviceInfo.wifi1Ssid}</span></div>
+          <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">WiFi 1 Pass</span><span className="text-slate-300 font-mono font-bold">{analysis.deviceInfo.wifi1Pass || "(không có)"}</span></div>
+          {analysis.deviceInfo.wifi2Ssid ? (
+            <>
+              <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">WiFi 2 SSID</span><span className="text-blue-300 font-mono font-bold">{analysis.deviceInfo.wifi2Ssid}</span></div>
+              <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">WiFi 2 Pass</span><span className="text-slate-300 font-mono font-bold">{analysis.deviceInfo.wifi2Pass || "(không có)"}</span></div>
+            </>
+          ) : (
+            <div className="flex justify-between text-[10px] lg:text-[11px]"><span className="text-slate-500">WiFi 2</span><span className="text-slate-600 font-mono">Không cấu hình</span></div>
           )}
         </div>
       )}
