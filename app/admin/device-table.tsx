@@ -592,6 +592,18 @@ type AnalysisIssue = {
   count: number;
 };
 
+function isPowerHistoryLog(message: string) {
+  const msg = message.trim();
+
+  return (
+    (/POWER HISTORY|LỊCH SỬ BẬT\/TẮT|LICH SU BAT\/TAT|BAT\/TAT/i.test(msg) && /session|phiên|phien/i.test(msg)) ||
+    /^={5,}/.test(msg) ||
+    /^-{5,}\s*\d+\s*-{5,}$/.test(msg) ||
+    /^StartTime\s*=/i.test(msg) ||
+    /^LastTime\s*=/i.test(msg)
+  );
+}
+
 type AnalysisResult = {
   healthScore: number;
   healthLabel: string;
@@ -912,7 +924,8 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
     };
   }, [mac]);
 
-  const analysis = analyzeDeviceLogs(logs);
+  const visibleLogs = logs.filter((log) => !isPowerHistoryLog(log.msg || ""));
+  const analysis = analyzeDeviceLogs(visibleLogs);
 
   const AnalysisContent = (
     <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4">
@@ -1005,7 +1018,7 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
           )}
         </div>
       )}
-      <div className="pt-2 text-[9px] lg:text-[10px] text-slate-600">* Realtime · {logs.length} bản ghi</div>
+      <div className="pt-2 text-[9px] lg:text-[10px] text-slate-600">* Realtime · {visibleLogs.length} bản ghi</div>
     </div>
   );
 
@@ -1041,7 +1054,7 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
           <button type="button" onClick={() => setActiveTab("logs")} className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider text-center transition-colors ${activeTab === "logs" ? "text-emerald-400 border-b-2 border-emerald-400 bg-slate-800/50" : "text-slate-500"}`}>
             <span className="flex items-center justify-center gap-1.5">
               <span className="material-symbols-outlined text-[14px]">terminal</span>
-              Log ({logs.length})
+              Log ({visibleLogs.length})
             </span>
           </button>
           <button type="button" onClick={() => setActiveTab("analysis")} className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider text-center transition-colors relative ${activeTab === "analysis" ? "text-blue-400 border-b-2 border-blue-400 bg-slate-800/50" : "text-slate-500"}`}>
@@ -1059,23 +1072,15 @@ function LogViewerModal({ mac, onClose }: { mac: string; onClose: () => void }) 
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
           {/* Logs */}
           <div className={`flex-1 overflow-y-auto p-2 lg:p-4 font-mono text-[11px] lg:text-[12px] leading-relaxed ${activeTab === "logs" ? "block" : "hidden lg:block"}`}>
-            {logs.length === 0 ? (
+            {visibleLogs.length === 0 ? (
               <div className="flex items-center gap-3 text-emerald-600/60 animate-pulse p-2">
                 <span className="inline-block w-2.5 h-4 bg-emerald-600/60" />
                 Đang kết nối tới Server...
               </div>
             ) : (
               <div className="flex flex-col">
-                {logs.map((log) => {
+                {visibleLogs.map((log) => {
                   const isOfflineSession = /OFFLINE_SESSION/i.test(log.msg);
-                  const isPwrHistHeader = /POWER HISTORY|={5,}/i.test(log.msg) && /session/i.test(log.msg);
-                  const isPwrHistSeparator = /^-{5,}\s*\d+\s*-{5,}$/.test(log.msg.trim());
-                  const isPwrHistStart = /^StartTime\s*=/i.test(log.msg.trim());
-                  const isPwrHistLast = /^LastTime\s*=/i.test(log.msg.trim());
-
-                  if (isPwrHistHeader || isPwrHistSeparator || isPwrHistStart || isPwrHistLast) {
-                    return null;
-                  }
 
                   let colorClass = "text-slate-300";
                   if (isOfflineSession) colorClass = "text-cyan-400";
