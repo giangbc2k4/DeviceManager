@@ -1,65 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DeviceManager
+
+Admin dashboard for managing registered devices, activity logs, reports, and OTA firmware uploads. The app uses Next.js API routes with Google Sheets as the main data source.
+
+## Features
+
+- Admin login and session handling.
+- Device registry management.
+- Device activity logs and reports.
+- Device license, toggle, expire, and delete API routes.
+- OTA firmware upload, activation, and deletion flows.
+- Google Sheets integration for device and activity data.
+- Report pages by chat/user ID.
+
+## Tech Stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Google APIs
+
+## Project Structure
+
+```text
+app/admin/            Admin dashboard pages and widgets
+app/api/              Device, firmware, login, logout, and OTA API routes
+app/report/           Public/report views
+lib/auth.ts           Admin authentication helpers
+lib/google-sheets.ts  Google Sheets integration
+lib/ota-github.ts     OTA/GitHub helper logic
+```
 
 ## Getting Started
 
-First, run the development server:
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+```env
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
+GOOGLE_SHEETS_SPREADSHEET_ID=
+GOOGLE_SHEETS_CLIENT_EMAIL=
+GOOGLE_SHEETS_PRIVATE_KEY=
+GOOGLE_SHEETS_DEVICE_SHEET=MAC_REGISTRY
+GOOGLE_SHEETS_ACTIVITY_SHEET=Sheet1
+GOOGLE_SHEETS_TZ_OFFSET_MINUTES=420
+```
+
+`GOOGLE_SHEETS_PRIVATE_KEY` should be stored as one line with `\n` characters.
+
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run start
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Deployment (Vercel)
-
-1. Import this repository to Vercel.
-2. Framework preset: Next.js (auto-detected).
-3. Build command: `npm run build`.
-4. Output directory: leave default for Next.js.
-5. Add all environment variables from `.env.example` in Vercel Project Settings -> Environment Variables.
-
-### Required Environment Variables
-
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-- `ADMIN_SESSION_SECRET`
-- `GOOGLE_SHEETS_SPREADSHEET_ID`
-- `GOOGLE_SHEETS_CLIENT_EMAIL`
-- `GOOGLE_SHEETS_PRIVATE_KEY`
-
-### Optional Environment Variables
-
-- `GOOGLE_SHEETS_DEVICE_SHEET` (default: `MAC_REGISTRY`)
-- `GOOGLE_SHEETS_ACTIVITY_SHEET` (default: `Sheet1`)
-- `GOOGLE_SHEETS_TZ_OFFSET_MINUTES` (default: `420`)
-
-### Private Key Format
-
-Set `GOOGLE_SHEETS_PRIVATE_KEY` as one line with `\n` characters, for example:
-
-`"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"`
+Deploy with the Next.js preset on Vercel. Add all required environment variables in the Vercel project settings before building.
