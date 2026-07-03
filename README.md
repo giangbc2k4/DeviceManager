@@ -1,18 +1,18 @@
 # DeviceManager
 
-Admin dashboard for managing registered devices, activity logs, reports, and OTA firmware uploads. The app uses Next.js API routes with Google Sheets as the main data source.
+Dashboard quản trị thiết bị đăng ký, nhật ký hoạt động, báo cáo và firmware OTA. Ứng dụng dùng Next.js API Routes với Google Sheets làm nguồn dữ liệu chính.
 
-## Features
+## Tính năng
 
-- Admin login and session handling.
-- Device registry management.
-- Device activity logs and reports.
-- Device license, toggle, expire, and delete API routes.
-- OTA firmware upload, activation, and deletion flows.
-- Google Sheets integration for device and activity data.
-- Report pages by chat/user ID.
+- Đăng nhập quản trị và quản lý phiên.
+- Quản lý danh sách thiết bị đăng ký.
+- Nhật ký hoạt động và báo cáo thiết bị.
+- API cấp phép, bật/tắt, hết hạn và xóa thiết bị.
+- Upload, kích hoạt và xóa firmware OTA.
+- Tích hợp Google Sheets cho thiết bị và hoạt động.
+- Trang báo cáo theo chat/user ID.
 
-## Tech Stack
+## Công nghệ
 
 - Next.js 16
 - React 19
@@ -20,7 +20,7 @@ Admin dashboard for managing registered devices, activity logs, reports, and OTA
 - Tailwind CSS 4
 - Google APIs
 
-## Project Structure
+## Cấu trúc dự án
 
 ```text
 app/admin/            Admin dashboard pages and widgets
@@ -31,18 +31,18 @@ lib/google-sheets.ts  Google Sheets integration
 lib/ota-github.ts     OTA/GitHub helper logic
 ```
 
-## Getting Started
+## Cài đặt và chạy
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Mở `http://localhost:3000`.
 
-## Environment Variables
+## Biến môi trường
 
-Copy `.env.example` to `.env.local` and fill in:
+Sao chép `.env.example` thành `.env.local` và điền:
 
 ```env
 ADMIN_EMAIL=
@@ -56,9 +56,9 @@ GOOGLE_SHEETS_ACTIVITY_SHEET=Sheet1
 GOOGLE_SHEETS_TZ_OFFSET_MINUTES=420
 ```
 
-`GOOGLE_SHEETS_PRIVATE_KEY` should be stored as one line with `\n` characters.
+`GOOGLE_SHEETS_PRIVATE_KEY` nên được lưu trên một dòng với ký tự `\n`.
 
-## Scripts
+## Lệnh npm
 
 ```bash
 npm run dev
@@ -67,9 +67,11 @@ npm run start
 npm run lint
 ```
 
-## Deployment
+## Bản triển khai
 
-Deploy with the Next.js preset on Vercel. Add all required environment variables in the Vercel project settings before building.
+**Website:** https://device-manager-three.vercel.app
+
+Ứng dụng được triển khai bằng preset Next.js trên Vercel. Cần thêm đầy đủ biến môi trường vào Vercel trước khi build; bản deploy chỉ hoạt động đúng khi Google service account, Google Sheets và thông tin đăng nhập admin đã được cấu hình.
 
 ## Kiến trúc và luồng dữ liệu
 
